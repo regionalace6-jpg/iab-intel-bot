@@ -1,5 +1,4 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const noblox = require('noblox.js');
 
 const client = new Client({
     intents: [
@@ -23,20 +22,47 @@ client.on("messageCreate", async message => {
     const command = args.shift().toLowerCase();
 
     if (command === "roblox") {
-        const userId = args[0];
-        if (!userId) return message.reply("❌ Provide a Roblox user ID.");
+        const input = args[0];
+        if (!input) return message.reply("❌ Provide a Roblox username or ID.");
 
         try {
-            const user = await noblox.getUserInfo(Number(userId));
+            let userId = input;
+
+            // If username, convert to ID
+            if (isNaN(input)) {
+                const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        usernames: [input],
+                        excludeBannedUsers: false
+                    })
+                });
+
+                const usernameData = await usernameRes.json();
+
+                if (!usernameData.data.length)
+                    return message.reply("❌ Username not found.");
+
+                userId = usernameData.data[0].id;
+            }
+
+            // Get user info
+            const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+            const user = await userRes.json();
+
+            if (!user.id)
+                return message.reply("❌ Invalid Roblox ID.");
 
             message.reply(
-                `👤 Username: **${user.username}**
+                `👤 Username: **${user.name}**
 🆔 User ID: **${user.id}**
-📅 Join Date: **${user.joinDate}**
-📦 Description: ${user.blurb || "No description"}`
+📅 Created: **${user.created}**
+📦 Description: ${user.description || "No description"}`
             );
+
         } catch (err) {
-            message.reply("❌ Invalid Roblox ID.");
+            message.reply("❌ Error fetching Roblox data.");
         }
     }
 });
