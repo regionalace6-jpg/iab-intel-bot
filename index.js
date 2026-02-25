@@ -1,4 +1,6 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+
+require("http").createServer((req, res) => res.end("Bot running")).listen(3000);
 
 const client = new Client({
     intents: [
@@ -28,7 +30,7 @@ client.on("messageCreate", async message => {
         try {
             let userId = input;
 
-            // If username, convert to ID
+            // Convert username to ID if needed
             if (isNaN(input)) {
                 const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
                     method: "POST",
@@ -40,7 +42,6 @@ client.on("messageCreate", async message => {
                 });
 
                 const usernameData = await usernameRes.json();
-
                 if (!usernameData.data.length)
                     return message.reply("❌ Username not found.");
 
@@ -51,19 +52,38 @@ client.on("messageCreate", async message => {
             const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
             const user = await userRes.json();
 
-         if (!user.id) {
-    console.log(user);
-    return message.reply("❌ Invalid Roblox ID.");
-}
+            if (!user.id)
+                return message.reply("❌ Invalid Roblox ID.");
 
-            message.reply(
-                `👤 Username: **${user.name}**
-🆔 User ID: **${user.id}**
-📅 Created: **${user.created}**
-📦 Description: ${user.description || "No description"}`
-            );
+            // Get avatar
+            const avatarRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`);
+            const avatarData = await avatarRes.json();
+            const avatarUrl = avatarData.data[0].imageUrl;
+
+            // Get badges
+            const badgesRes = await fetch(`https://badges.roblox.com/v1/users/${userId}/badges?limit=5&sortOrder=Desc`);
+            const badgesData = await badgesRes.json();
+
+            const badgeList = badgesData.data.length
+                ? badgesData.data.map(b => b.name).join(", ")
+                : "No badges";
+
+            const embed = new EmbedBuilder()
+                .setColor(0x0099ff)
+                .setTitle(`${user.name}'s Roblox Profile`)
+                .setThumbnail(avatarUrl)
+                .addFields(
+                    { name: "User ID", value: `${user.id}`, inline: true },
+                    { name: "Created", value: `${new Date(user.created).toDateString()}`, inline: true },
+                    { name: "Badges (Latest 5)", value: badgeList }
+                )
+                .setDescription(user.description || "No description")
+                .setFooter({ text: "IAB Intelligence System" });
+
+            message.reply({ embeds: [embed] });
 
         } catch (err) {
+            console.log(err);
             message.reply("❌ Error fetching Roblox data.");
         }
     }
