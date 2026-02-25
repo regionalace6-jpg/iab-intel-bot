@@ -1,5 +1,6 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
-const axios = require("axios");
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+
+require("http").createServer((req, res) => res.end("Bot running")).listen(3000);
 
 const client = new Client({
     intents: [
@@ -9,114 +10,96 @@ const client = new Client({
     ]
 });
 
-/* ================= ANTI CRASH ================= */
+const prefix = "!";
 
-process.on("unhandledRejection", console.error);
-process.on("uncaughtException", console.error);
-
-/* ================= BOT READY ================= */
-
-client.once("ready", () => {
+client.once("clientReady", () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
-/* ================= DISCORD FIND ================= */
+client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith(prefix)) return;
 
-async function findDiscordUser(id, message) {
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    if (command !== "roblox") return;
+
+    const input = args[0];
+    if (!input) return message.reply("❌ Provide a Roblox username or ID.");
+
     try {
-        const user = await client.users.fetch(id);
+        let userId = input;
 
-        const embed = new EmbedBuilder()
-            .setTitle("🔵 Discord Intelligence Report")
-            .setThumbnail(user.displayAvatarURL())
-            .setColor("Blue")
-            .addFields(
-                { name: "Username", value: user.tag, inline: true },
-                { name: "User ID", value: user.id, inline: true },
-                { name: "Bot Account", value: user.bot ? "Yes" : "No" },
-                { name: "Created At", value: user.createdAt.toDateString() }
-            );
-
-        message.reply({ embeds: [embed] });
-
-    } catch {
-        message.reply("❌ Discord user not found.");
-    }
-}
-
-/* ================= ROBLOX FIND ================= */
-
-async function findRobloxUser(input, message) {
-    try {
-        let userId;
-
-        if (!isNaN(input)) {
-            userId = input;
-        } else {
-            const res = await axios.post(
-                "https://users.roblox.com/v1/usernames/users",
-                {
+        // Convert username to ID
+        if (isNaN(input)) {
+            const usernameRes = await fetch("https://users.roblox.com/v1/usernames/users", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
                     usernames: [input],
                     excludeBannedUsers: false
-                }
-            );
+                })
+            });
 
-            if (!res.data.data[0])
-                return message.reply("❌ Roblox user not found.");
+            const usernameData = await usernameRes.json();
+            if (!usernameData.data || !usernameData.data.length)
+                return message.reply("❌ Username not found.");
 
-            userId = res.data.data[0].id;
+            userId = usernameData.data[0].id;
         }
 
-        const info = (await axios.get(
-            `https://users.roblox.com/v1/users/${userId}`
-        )).data;
+        // Get user info
+        const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+        const user = await userRes.json();
 
-        const avatar = (await axios.get(
-            `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png`
-        )).data.data[0].imageUrl;
+        if (!user || !user.id)
+            return message.reply("❌ Invalid Roblox user.");
 
-        const createdDate = new Date(info.created);
-        const ageDays = Math.floor((Date.now() - createdDate) / 86400000);
+        // Get avatar
+        let avatarUrl = null;
+        try {
+            const avatarRes = await fetch(
+                `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=420x420&format=Png&isCircular=false`
+            );
+            const avatarData = await avatarRes.json();
+            avatarUrl = avatarData?.data?.[0]?.imageUrl || null;
+        } catch {}
+
+        // Get badges safely
+        let badgeList = "No badges";
+        try {
+            const badgesRes = await fetch(
+                `https://badges.roblox.com/v1/users/${userId}/badges?limit=5&sortOrder=Desc`
+            );
+
+            if (badgesRes.ok) {
+                const badgesData = await badgesRes.json();
+                if (badgesData && Array.isArray(badgesData.data) && badgesData.data.length > 0) {
+                    badgeList = badgesData.data.map(b => b.name).join(", ");
+                }
+            }
+        } catch {}
 
         const embed = new EmbedBuilder()
-            .setTitle("🟥 Roblox Intelligence Report")
-            .setThumbnail(avatar)
-            .setColor("Red")
+            .setColor(0x0099ff)
+            .setTitle(`${user.name}'s Roblox Profile`)
+            .setDescription(user.description || "No description")
             .addFields(
-                { name: "Username", value: info.name, inline: true },
-                { name: "Display Name", value: info.displayName, inline: true },
-                { name: "User ID", value: info.id.toString(), inline: true },
-                { name: "Account Created", value: createdDate.toDateString() },
-                { name: "Account Age", value: `${ageDays} days` }
-            );
+                { name: "User ID", value: `${user.id}`, inline: true },
+                { name: "Created", value: new Date(user.created).toDateString(), inline: true },
+                { name: "Latest Badges", value: badgeList }
+            )
+            .setFooter({ text: "IAB Intelligence System" });
+
+        if (avatarUrl) embed.setThumbnail(avatarUrl);
 
         message.reply({ embeds: [embed] });
 
-    } catch {
+    } catch (err) {
+        console.log("MAIN ERROR:", err);
         message.reply("❌ Error fetching Roblox data.");
     }
-}
-
-/* ================= COMMAND HANDLER ================= */
-
-client.on("messageCreate", async message => {
-
-    if (message.author.bot) return;
-
-    const args = message.content.split(" ");
-
-    if (args[0] === "!find") {
-        if (!args[1]) return message.reply("Provide Discord ID.");
-        findDiscordUser(args[1], message);
-    }
-
-    if (args[0] === "!rfind") {
-        if (!args[1]) return message.reply("Provide Roblox username or ID.");
-        findRobloxUser(args[1], message);
-    }
-
 });
-
-/* ================= LOGIN ================= */
 
 client.login(process.env.TOKEN);
