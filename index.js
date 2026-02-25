@@ -51,8 +51,10 @@ client.on("messageCreate", async message => {
             const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
             const user = await userRes.json();
 
-            if (!user.id)
-                return message.reply("❌ Invalid Roblox ID.");
+         if (!user.id) {
+    console.log(user);
+    return message.reply("❌ Invalid Roblox ID.");
+}
 
             message.reply(
                 `👤 Username: **${user.name}**
