@@ -33,4 +33,4 @@ client.on("interactionCreate", async interaction => {
     }
 });
 
-client.login(process.env.MTQ3NjIwODY2NDA5NTIzMjE1MQ.Gqz79o.bmnGHPQtDwnz5XGr9IfDn4ttkCPcSy4otUh3XE);
+client.login(process.env.TOKEN);
