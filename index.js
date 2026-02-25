@@ -2,33 +2,41 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const noblox = require('noblox.js');
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
 const prefix = "!";
 
-client.once("ready", () => {
+client.once("clientReady", () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
-client.on("interactionCreate", async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+client.on("messageCreate", async message => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith(prefix)) return;
 
-    if (interaction.commandName === "roblox") {
-        const userId = interaction.options.getString("id");
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    if (command === "roblox") {
+        const userId = args[0];
+        if (!userId) return message.reply("❌ Provide a Roblox user ID.");
 
         try {
             const user = await noblox.getUserInfo(Number(userId));
 
-            await interaction.reply({
-                content: `👤 Username: **${user.username}**
+            message.reply(
+                `👤 Username: **${user.username}**
 🆔 User ID: **${user.id}**
 📅 Join Date: **${user.joinDate}**
-📦 Description: ${user.blurb || "No description"}`,
-            });
-
+📦 Description: ${user.blurb || "No description"}`
+            );
         } catch (err) {
-            await interaction.reply("❌ Invalid Roblox ID.");
+            message.reply("❌ Invalid Roblox ID.");
         }
     }
 });
