@@ -73,9 +73,11 @@ client.on("messageCreate", async message => {
             );
             const badgesData = await badgesRes.json();
 
-            if (badgesData?.data?.length) {
-                badgeList = badgesData.data.map(b => b.name).join(", ");
-            }
+          if (badgesData && Array.isArray(badgesData.data) && badgesData.data.length > 0) {
+    badgeList = badgesData.data.map(b => b.name).join(", ");
+} else {
+    badgeList = "No badges or hidden";
+}
         } catch {}
 
         const { EmbedBuilder } = require("discord.js");
