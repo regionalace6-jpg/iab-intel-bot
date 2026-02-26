@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { Client, GatewayIntentBits } = require("discord.js");
+const axios = require("axios");
 
 const client = new Client({
     intents: [
@@ -23,58 +24,51 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(prefix.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
+    // Roblox Intelligence Command
     if (command === "roblox") {
 
         const input = args[0];
-        if (!input) return message.reply("❌ Provide Roblox username or ID.");
+        if (!input) return message.reply("❌ Provide username or ID");
 
         try {
 
             let userId = input;
 
-            // Convert username → ID
+            // Username → ID
             if (isNaN(input)) {
 
-                const usernameRes = await fetch(
+                const res = await axios.post(
                     "https://users.roblox.com/v1/usernames/users",
                     {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            usernames: [input],
-                            excludeBannedUsers: false
-                        })
+                        usernames: [input],
+                        excludeBannedUsers: false
                     }
                 );
 
-                const usernameData = await usernameRes.json();
+                if (!res.data.data.length)
+                    return message.reply("❌ User not found");
 
-                if (!usernameData.data.length)
-                    return message.reply("❌ Username not found.");
-
-                userId = usernameData.data[0].id;
+                userId = res.data.data[0].id;
             }
 
-            // Get user info
-            const userRes = await fetch(
+            // Get user profile
+            const userRes = await axios.get(
                 `https://users.roblox.com/v1/users/${userId}`
             );
 
-            const user = await userRes.json();
-
-            if (!user.id)
-                return message.reply("❌ Invalid Roblox ID.");
+            const user = userRes.data;
 
             message.reply(`
+🧠 Intelligence Report
 👤 Username: ${user.name}
-🆔 User ID: ${user.id}
+🆔 ID: ${user.id}
 📅 Created: ${user.created}
 📦 Description: ${user.description || "No description"}
             `);
 
         } catch (err) {
             console.log(err);
-            message.reply("❌ Error fetching Roblox data.");
+            message.reply("❌ Error fetching Roblox data");
         }
     }
 
