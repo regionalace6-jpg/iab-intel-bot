@@ -1,13 +1,15 @@
 {
   "name": "advanced-userinfo-bot",
-  "version": "1.0.0",
-  "description": "Discord + Roblox Info Bot",
+  "version": "2.0.0",
+  "description": "Bureau Level Discord + Roblox Investigation Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "node-fetch": "^3.3.2"
+    "discord.js": "^14.14.1"
   }
 }
