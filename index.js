@@ -13,20 +13,19 @@ const PREFIX = "!";
 
 /*
 =====================================
- COMMAND CENTER UI BUILDER
+ UI BUILDER
 =====================================
 */
 
-function Dossier(title, description, fields = []) {
+function Panel(title, fields = []) {
 
     return new EmbedBuilder()
-        .setTitle(`🟥 Intelligence COMMAND CENTER | ${title}`)
-        .setDescription(description || "Intelligence Report")
+        .setTitle(`🟥 INTELLIGENCE CENTER | ${title}`)
         .addFields(fields)
         .setColor("#ff0000")
         .setTimestamp()
         .setFooter({
-            text: "Intelligence Bureau System"
+            text: "Intelligence Bureau Network"
         });
 }
 
@@ -40,22 +39,19 @@ const commands = {};
 
 /*
 =====================================
- HELP COMMAND (COMMAND CENTER DASHBOARD)
+ HELP COMMAND (GOATED UI)
 =====================================
 */
 
 commands.help = async (msg) => {
 
-    const embed = Dossier(
-        "Command Control Dashboard",
-        "Active Intelligence Modules",
-        [
-            { name: "👤 User Intelligence", value: "!userinfo | !avatar" },
-            { name: "🎮 Roblox Intelligence", value: "!robloxinfo" },
-            { name: "🌍 OSINT Tools", value: "!iplookup" },
-            { name: "🤖 System", value: "!ping | !serverinfo" }
-        ]
-    );
+    const embed = Panel("Command List", [
+        { name: "👤 User Intelligence", value: "!userinfo — Show user profile intelligence" },
+        { name: "🎮 Roblox Intelligence", value: "!robloxinfo — Show Roblox profile data" },
+        { name: "🌍 Geo Intelligence", value: "!iplookup — Public IP location scan" },
+        { name: "🤖 Utility", value: "!ping — Bot latency\n!avatar — Profile picture\n!serverinfo — Server data" },
+        { name: "🧠 Analysis", value: "!iq — Intelligence rating\n!aura — Aura rating" }
+    ]);
 
     msg.reply({ embeds: [embed] });
 };
@@ -67,12 +63,27 @@ commands.help = async (msg) => {
 */
 
 commands.ping = async (msg) => {
-    msg.reply(`🟥 Command Center Latency: ${client.ws.ping}ms`);
+    msg.reply(`🏓 Command Center Latency: ${client.ws.ping}ms`);
 };
 
 /*
 =====================================
- USER DOSSIER
+ AVATAR
+=====================================
+*/
+
+commands.avatar = async (msg) => {
+
+    let user = msg.mentions.users.first() || msg.author;
+
+    msg.reply(
+        user.displayAvatarURL({ dynamic: true, size: 512 })
+    );
+};
+
+/*
+=====================================
+ USER INTEL
 =====================================
 */
 
@@ -90,22 +101,18 @@ commands.userinfo = async (msg, args) => {
         (Date.now() - user.createdTimestamp) / 86400000
     );
 
-    const embed = Dossier(
-        "Subject Dossier",
-        "",
-        [
-            { name: "Subject", value: user.tag, inline: true },
-            { name: "ID", value: user.id, inline: true },
-            { name: "Account Age", value: `${ageDays} days`, inline: true }
-        ]
-    ).setThumbnail(user.displayAvatarURL({ dynamic: true }));
+    const embed = Panel("Subject Intelligence Report", [
+        { name: "Username", value: user.tag, inline: true },
+        { name: "User ID", value: user.id, inline: true },
+        { name: "Account Age", value: `${ageDays} days`, inline: true }
+    ]).setThumbnail(user.displayAvatarURL({ dynamic: true }));
 
     msg.reply({ embeds: [embed] });
 };
 
 /*
 =====================================
- ROBLOX DOSSIER
+ ROBLOX INTEL
 =====================================
 */
 
@@ -134,7 +141,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("Subject not found");
+                return msg.reply("Roblox subject not found");
 
             target = data.data[0].id;
         }
@@ -143,26 +150,22 @@ commands.robloxinfo = async (msg, args) => {
             `https://users.roblox.com/v1/users/${target}`
         ).then(r => r.json());
 
-        const embed = Dossier(
-            "Roblox Subject Profile",
-            "",
-            [
-                { name: "Username", value: info.name || "Unknown" },
-                { name: "Display", value: info.displayName || "Unknown" },
-                { name: "Created", value: new Date(info.created).toDateString() }
-            ]
-        );
+        const embed = Panel("Roblox Subject Profile", [
+            { name: "Username", value: info.name || "Unknown" },
+            { name: "Display", value: info.displayName || "Unknown" },
+            { name: "Created", value: new Date(info.created).toDateString() }
+        ]);
 
         msg.reply({ embeds: [embed] });
 
     } catch {
-        msg.reply("Roblox intelligence failure");
+        msg.reply("Roblox intelligence scan failed");
     }
 };
 
 /*
 =====================================
- GEO INTEL IP SCAN
+ GEO IP INTEL
 =====================================
 */
 
@@ -177,21 +180,37 @@ commands.iplookup = async (msg, args) => {
             `https://ipapi.co/${args[0]}/json/`
         ).then(r => r.json());
 
-        const embed = Dossier(
-            "Geo Intelligence Scan",
-            "",
-            [
-                { name: "City", value: data.city || "Unknown" },
-                { name: "Country", value: data.country_name || "Unknown" },
-                { name: "ISP", value: data.org || "Unknown" }
-            ]
-        );
+        const embed = Panel("Geo Intelligence Scan", [
+            { name: "City", value: data.city || "Unknown" },
+            { name: "Country", value: data.country_name || "Unknown" },
+            { name: "ISP", value: data.org || "Unknown" }
+        ]);
 
         msg.reply({ embeds: [embed] });
 
     } catch {
         msg.reply("Geo scan failed");
     }
+};
+
+/*
+=====================================
+ FUN INTEL
+=====================================
+*/
+
+commands.iq = async (msg) => {
+
+    const iq = Math.floor(Math.random() * 100) + 1;
+
+    msg.reply(`🧠 Intelligence Rating: ${iq}`);
+};
+
+commands.aura = async (msg) => {
+
+    const aura = ["Legendary", "Elite", "Sigma", "Unknown"][Math.floor(Math.random() * 4)];
+
+    msg.reply(`✨ Aura Rating: ${aura}`);
 };
 
 /*
@@ -219,12 +238,12 @@ client.on("messageCreate", async msg => {
 
 /*
 =====================================
- READY EVENT
+ READY
 =====================================
 */
 
 client.once("ready", () => {
-    console.log(`🟥 INTELLIGENCE COMMAND CENTER ONLINE | ${client.user.tag}`);
+    console.log(`🟥 INTELLIGENCE CENTER ONLINE | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
