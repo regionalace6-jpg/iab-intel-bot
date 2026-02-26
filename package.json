@@ -1,9 +1,8 @@
 {
   "name": "advanced-userinfo-bot",
   "version": "1.0.0",
-  "description": "Advanced Discord user info UI",
+  "description": "Advanced Discord userinfo bot",
   "main": "index.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
