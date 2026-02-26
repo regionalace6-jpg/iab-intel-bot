@@ -1,21 +1,24 @@
 const {
     Client,
     GatewayIntentBits,
-    EmbedBuilder,
-    ActionRowBuilder,
-    StringSelectMenuBuilder
+    EmbedBuilder
 } = require("discord.js");
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
 });
 
-const PREFIX = "B";
+/*
+=====================================
+ COMMAND PREFIX STYLE
+=====================================
+*/
+
+const PREFIX = "CommandsOptic.";
 
 /*
 =====================================
@@ -23,20 +26,19 @@ const PREFIX = "B";
 =====================================
 */
 
-function OPTPanel(title, desc = "", fields = []) {
+function OpticPanel(title, fields = [], desc = "") {
 
     return new EmbedBuilder()
-        .setTitle(`🟥 OPT INTELLIGENCE | ${title}`)
+        .setTitle(`🟥 COMMANDS OPTIC | ${title}`)
         .setDescription(desc)
         .addFields(fields)
         .setColor("#000000")
-        .setTimestamp()
-        .setFooter({ text: "OPT Intelligence Network" });
+        .setTimestamp();
 }
 
 /*
 =====================================
- COMMAND SYSTEM
+ COMMANDS
 =====================================
 */
 
@@ -44,54 +46,67 @@ const commands = {};
 
 /*
 =====================================
- HELP COMMAND (FULL COMMAND LIST)
+ HELP
 =====================================
 */
 
-commands.help = async (msg) => {
+commands.help = async msg => {
 
-    const embed = OPTPanel(
-        "Command List",
-        "OPT Intelligence Bureau Commands"
-    ).addFields([
+    const helpText = `
+🟥 COMMANDS OPTIC NETWORK
 
-        { name: "👤 User Intelligence", value: "Buserinfo | Bavatar" },
+CommandsOptic.help
+CommandsOptic.ping
+CommandsOptic.userinfo <user>
+CommandsOptic.robloxinfo <username/ID>
+CommandsOptic.robloxavatar <ID>
 
-        { name: "🎮 Roblox Intelligence", value: "Brobloxinfo | Brobloxavatar" },
+🌍 OSINT
+CommandsOptic.iplookup <IP>
+CommandsOptic.dnslookup <domain>
+CommandsOptic.domaininfo <domain>
+CommandsOptic.geoip <IP>
 
-        { name: "🌍 OSINT Tools", value: "Biplookup | Bgeoip | Bdnslookup | Bdomaininfo" },
+👤 DISCORD
+CommandsOptic.lookup <UserID>
 
-        { name: "🤖 Utility", value: "Bping | Biq | Bhelp" }
+🤖 FUN
+CommandsOptic.quote
+CommandsOptic.iq
+`;
 
-    ]);
-
-    msg.reply({ embeds: [embed] });
+    msg.reply("```" + helpText + "```");
 };
 
 /*
 =====================================
- BASIC COMMANDS
+ BASIC
 =====================================
 */
 
 commands.ping = async msg => {
-    msg.reply(`🏴 OPT Latency: ${client.ws.ping}ms`);
-};
-
-commands.avatar = async msg => {
-
-    let user = msg.mentions.users.first() || msg.author;
-
-    msg.reply(user.displayAvatarURL({ dynamic: true, size: 512 }));
+    msg.reply(`🏴 Latency: ${client.ws.ping}ms`);
 };
 
 commands.iq = async msg => {
-    msg.reply(`🧠 Intelligence Score: ${Math.floor(Math.random() * 100) + 1}`);
+    msg.reply(`🧠 IQ Score: ${Math.floor(Math.random() * 100) + 1}`);
+};
+
+commands.quote = async msg => {
+
+    const quotes = [
+        "Data is power",
+        "Observe before acting",
+        "Intelligence > Force",
+        "Knowledge is survival"
+    ];
+
+    msg.reply("🧠 " + quotes[Math.floor(Math.random() * quotes.length)]);
 };
 
 /*
 =====================================
- USER INTELLIGENCE
+ USER INTEL
 =====================================
 */
 
@@ -109,13 +124,12 @@ commands.userinfo = async (msg, args) => {
         (Date.now() - user.createdTimestamp) / 86400000
     );
 
-    const embed = OPTPanel(
+    const embed = OpticPanel(
         "User Intelligence",
-        "",
         [
             { name: "Username", value: user.tag, inline: true },
             { name: "User ID", value: user.id, inline: true },
-            { name: "Account Age", value: `${age} days`, inline: true }
+            { name: "Account Age", value: age + " days", inline: true }
         ]
     );
 
@@ -124,14 +138,13 @@ commands.userinfo = async (msg, args) => {
 
 /*
 =====================================
- ROBLOX INTELLIGENCE
+ ROBLOX INTEL
 =====================================
 */
 
 commands.robloxinfo = async (msg, args) => {
 
-    if (!args[0])
-        return msg.reply("Provide Roblox username or ID");
+    if (!args[0]) return msg.reply("Provide Roblox username");
 
     try {
 
@@ -153,7 +166,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("Roblox user not found");
+                return msg.reply("User not found");
 
             target = data.data[0].id;
         }
@@ -162,9 +175,8 @@ commands.robloxinfo = async (msg, args) => {
             `https://users.roblox.com/v1/users/${target}`
         ).then(r => r.json());
 
-        const embed = OPTPanel(
+        const embed = OpticPanel(
             "Roblox Intelligence",
-            "",
             [
                 { name: "Username", value: info.name || "Unknown" },
                 { name: "Display", value: info.displayName || "Unknown" },
@@ -181,21 +193,6 @@ commands.robloxinfo = async (msg, args) => {
 
 /*
 =====================================
- ROBLOX AVATAR
-=====================================
-*/
-
-commands.robloxavatar = async (msg, args) => {
-
-    if (!args[0]) return msg.reply("Provide Roblox ID");
-
-    msg.reply(
-        `https://www.roblox.com/headshot-thumbnail/image?userId=${args[0]}&width=420&height=420&format=png`
-    );
-};
-
-/*
-=====================================
  OSINT TOOLS
 =====================================
 */
@@ -204,47 +201,22 @@ commands.iplookup = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide IP");
 
-    try {
+    const data = await fetch(
+        `http://ip-api.com/json/${args[0]}`
+    ).then(r => r.json());
 
-        const data = await fetch(
-            `http://ip-api.com/json/${args[0]}`
-        ).then(r => r.json());
-
-        const embed = OPTPanel(
-            "Geo Intelligence",
-            "",
-            [
-                { name: "Country", value: data.country || "Unknown" },
-                { name: "City", value: data.city || "Unknown" },
-                { name: "Region", value: data.regionName || "Unknown" },
-                { name: "ISP", value: data.isp || "Unknown" }
-            ]
-        );
-
-        msg.reply({ embeds: [embed] });
-
-    } catch {
-        msg.reply("IP scan failed");
-    }
+    msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
 };
 
 commands.dnslookup = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide domain");
 
-    try {
+    const data = await fetch(
+        `https://dns.google/resolve?name=${args[0]}`
+    ).then(r => r.json());
 
-        const data = await fetch(
-            `https://dns.google/resolve?name=${args[0]}`
-        ).then(r => r.json());
-
-        const records = data.Answer?.map(r => r.data).join("\n") || "No records";
-
-        msg.reply("```\n" + records.substring(0, 1800) + "\n```");
-
-    } catch {
-        msg.reply("DNS scan failed");
-    }
+    msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
 };
 
 commands.domaininfo = async (msg, args) => {
@@ -282,7 +254,7 @@ client.on("messageCreate", async msg => {
 });
 
 client.once("ready", () => {
-    console.log(`🟥 OPT Intelligence Online | ${client.user.tag}`);
+    console.log(`🟥 COMMANDS OPTIC ONLINE | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
