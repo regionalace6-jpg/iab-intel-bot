@@ -10,7 +10,7 @@ const {
   ActionRowBuilder
 } = require('discord.js');
 
-const TOKEN = 'MTQ3NjUxOTk0Nzk2OTQ5OTE2Ng.Gn1cu5.URvioM4MxRTAGGCzs9xPwWm3aGAu9a5S3U09GE';
+const TOKEN = MTQ3NjUxOTk0Nzk2OTQ5OTE2Ng.G367P9.Y3g5UfsopaBhyEyJ8cgI06kaBEvcN5DO6Hm-hk';
 const CLIENT_ID = '1476519947969499166';
 const GUILD_ID = '1472113817722028197';
 
