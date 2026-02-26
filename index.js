@@ -19,7 +19,7 @@ const PREFIX = "B";
 
 /*
 =====================================
- OPT INTELLIGENCE UI BUILDER
+ UI BUILDER
 =====================================
 */
 
@@ -31,9 +31,7 @@ function OPTPanel(title, desc = "", fields = []) {
         .addFields(fields)
         .setColor("#000000")
         .setTimestamp()
-        .setFooter({
-            text: "OPT Intelligence Network"
-        });
+        .setFooter({ text: "OPT Intelligence Network" });
 }
 
 /*
@@ -44,93 +42,40 @@ function OPTPanel(title, desc = "", fields = []) {
 
 const commands = {};
 
-/* ---------- HELP ---------- */
+/*
+=====================================
+ HELP COMMAND (FULL COMMAND LIST)
+=====================================
+*/
 
 commands.help = async (msg) => {
 
-    const menu = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-            .setCustomId("opt_help")
-            .setPlaceholder("Select OPT Intelligence Category")
-            .addOptions([
-                { label: "👤 User Intelligence", value: "user" },
-                { label: "🎮 Roblox Intelligence", value: "roblox" },
-                { label: "🌍 OSINT Tools", value: "osint" },
-                { label: "🤖 Utilities", value: "util" }
-            ])
-    );
-
     const embed = OPTPanel(
-        "Command Center",
-        "Select Intelligence Category Below"
-    );
+        "Command List",
+        "OPT Intelligence Bureau Commands"
+    ).addFields([
 
-    const sent = await msg.reply({
-        embeds: [embed],
-        components: [menu]
-    });
+        { name: "👤 User Intelligence", value: "Buserinfo | Bavatar" },
 
-    const collector = sent.createMessageComponentCollector({
-        time: 60000
-    });
+        { name: "🎮 Roblox Intelligence", value: "Brobloxinfo | Brobloxavatar" },
 
-    collector.on("collect", async interaction => {
+        { name: "🌍 OSINT Tools", value: "Biplookup | Bgeoip | Bdnslookup | Bdomaininfo" },
 
-        if (interaction.user.id !== msg.author.id)
-            return interaction.reply({
-                content: "Not your menu",
-                ephemeral: true
-            });
+        { name: "🤖 Utility", value: "Bping | Biq | Bhelp" }
 
-        let response;
+    ]);
 
-        switch (interaction.values[0]) {
-
-            case "user":
-                response = OPTPanel("User Intelligence",
-                    "",
-                    [
-                        { name: "Commands", value: "Buserinfo | Bavatar" }
-                    ]);
-                break;
-
-            case "roblox":
-                response = OPTPanel("Roblox Intelligence",
-                    "",
-                    [
-                        { name: "Commands", value: "Brobloxinfo" }
-                    ]);
-                break;
-
-            case "osint":
-                response = OPTPanel("OSINT Intelligence",
-                    "",
-                    [
-                        { name: "Commands", value: "Biplookup | Bdnslookup" }
-                    ]);
-                break;
-
-            case "util":
-                response = OPTPanel("Utilities",
-                    "",
-                    [
-                        { name: "Commands", value: "Bping | Bhelp | Biq" }
-                    ]);
-                break;
-        }
-
-        interaction.update({
-            embeds: [response],
-            components: [menu]
-        });
-
-    });
+    msg.reply({ embeds: [embed] });
 };
 
-/* ---------- BASIC ---------- */
+/*
+=====================================
+ BASIC COMMANDS
+=====================================
+*/
 
 commands.ping = async msg => {
-    msg.reply(`🏴 OPT Intelligence Ping: ${client.ws.ping}ms`);
+    msg.reply(`🏴 OPT Latency: ${client.ws.ping}ms`);
 };
 
 commands.avatar = async msg => {
@@ -141,10 +86,14 @@ commands.avatar = async msg => {
 };
 
 commands.iq = async msg => {
-    msg.reply(`🧠 OPT Intelligence Rating: ${Math.floor(Math.random() * 100) + 1}`);
+    msg.reply(`🧠 Intelligence Score: ${Math.floor(Math.random() * 100) + 1}`);
 };
 
-/* ---------- USER INTEL ---------- */
+/*
+=====================================
+ USER INTELLIGENCE
+=====================================
+*/
 
 commands.userinfo = async (msg, args) => {
 
@@ -161,11 +110,11 @@ commands.userinfo = async (msg, args) => {
     );
 
     const embed = OPTPanel(
-        "Subject Profile",
+        "User Intelligence",
         "",
         [
             { name: "Username", value: user.tag, inline: true },
-            { name: "ID", value: user.id, inline: true },
+            { name: "User ID", value: user.id, inline: true },
             { name: "Account Age", value: `${age} days`, inline: true }
         ]
     );
@@ -173,7 +122,11 @@ commands.userinfo = async (msg, args) => {
     msg.reply({ embeds: [embed] });
 };
 
-/* ---------- ROBLOX INTEL ---------- */
+/*
+=====================================
+ ROBLOX INTELLIGENCE
+=====================================
+*/
 
 commands.robloxinfo = async (msg, args) => {
 
@@ -200,7 +153,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("User not found");
+                return msg.reply("Roblox user not found");
 
             target = data.data[0].id;
         }
@@ -210,7 +163,7 @@ commands.robloxinfo = async (msg, args) => {
         ).then(r => r.json());
 
         const embed = OPTPanel(
-            "Roblox Profile",
+            "Roblox Intelligence",
             "",
             [
                 { name: "Username", value: info.name || "Unknown" },
@@ -226,7 +179,26 @@ commands.robloxinfo = async (msg, args) => {
     }
 };
 
-/* ---------- OSINT ---------- */
+/*
+=====================================
+ ROBLOX AVATAR
+=====================================
+*/
+
+commands.robloxavatar = async (msg, args) => {
+
+    if (!args[0]) return msg.reply("Provide Roblox ID");
+
+    msg.reply(
+        `https://www.roblox.com/headshot-thumbnail/image?userId=${args[0]}&width=420&height=420&format=png`
+    );
+};
+
+/*
+=====================================
+ OSINT TOOLS
+=====================================
+*/
 
 commands.iplookup = async (msg, args) => {
 
@@ -243,8 +215,8 @@ commands.iplookup = async (msg, args) => {
             "",
             [
                 { name: "Country", value: data.country || "Unknown" },
-                { name: "Region", value: data.regionName || "Unknown" },
                 { name: "City", value: data.city || "Unknown" },
+                { name: "Region", value: data.regionName || "Unknown" },
                 { name: "ISP", value: data.isp || "Unknown" }
             ]
         );
@@ -275,7 +247,22 @@ commands.dnslookup = async (msg, args) => {
     }
 };
 
-/* ---------- MESSAGE HANDLER ---------- */
+commands.domaininfo = async (msg, args) => {
+
+    if (!args[0]) return msg.reply("Provide domain");
+
+    const data = await fetch(
+        `https://api.hackertarget.com/whois/?q=${args[0]}`
+    ).then(r => r.text());
+
+    msg.reply("```\n" + data.substring(0, 1800) + "\n```");
+};
+
+/*
+=====================================
+ MESSAGE HANDLER
+=====================================
+*/
 
 client.on("messageCreate", async msg => {
 
