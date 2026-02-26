@@ -32,7 +32,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('roblox')
-    .setDescription('Get Roblox user info')
+    .setDescription('Get advanced Roblox user info')
     .addStringOption(option =>
       option.setName('username')
         .setDescription('Roblox username')
@@ -88,19 +88,20 @@ client.on('interactionCreate', async interaction => {
         { name: 'Badges', value: badgeList },
         { name: `Roles (${member.roles.cache.size - 1})`, value: roles }
       )
-      .setFooter({ text: `Requested by ${interaction.user.tag}` })
       .setTimestamp();
 
     return interaction.reply({ embeds: [embed] });
   }
 
-  // ================= ROBLOX USERINFO =================
+  // ================= ADVANCED ROBLOX =================
   if (interaction.commandName === 'roblox') {
 
     const username = interaction.options.getString('username');
 
     try {
-      // Get user ID
+      await interaction.deferReply();
+
+      // Get User ID
       const userRes = await fetch('https://users.roblox.com/v1/usernames/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,16 +110,38 @@ client.on('interactionCreate', async interaction => {
 
       const userData = await userRes.json();
       if (!userData.data || !userData.data[0]) {
-        return interaction.reply({ content: 'User not found.', ephemeral: true });
+        return interaction.editReply('User not found.');
       }
 
       const robloxUser = userData.data[0];
 
-      // Get full profile
-      const profileRes = await fetch(`https://users.roblox.com/v1/users/${robloxUser.id}`);
-      const profile = await profileRes.json();
+      // Profile
+      const profile = await (await fetch(`https://users.roblox.com/v1/users/${robloxUser.id}`)).json();
 
-      // Get avatar
+      // Followers
+      const followers = await (await fetch(`https://friends.roblox.com/v1/users/${robloxUser.id}/followers/count`)).json();
+
+      // Following
+      const following = await (await fetch(`https://friends.roblox.com/v1/users/${robloxUser.id}/followings/count`)).json();
+
+      // Friends
+      const friends = await (await fetch(`https://friends.roblox.com/v1/users/${robloxUser.id}/friends/count`)).json();
+
+      // Presence
+      const presenceRes = await fetch('https://presence.roblox.com/v1/presence/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: [robloxUser.id] })
+      });
+      const presenceData = await presenceRes.json();
+
+      const presenceType = presenceData.userPresences[0]?.userPresenceType;
+
+      let status = "Offline";
+      if (presenceType === 1) status = "Online";
+      if (presenceType === 2) status = "In Game";
+
+      // Avatar
       const avatarRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png&isCircular=false`);
       const avatarData = await avatarRes.json();
       const avatarUrl = avatarData.data[0].imageUrl;
@@ -129,18 +152,22 @@ client.on('interactionCreate', async interaction => {
         .setThumbnail(avatarUrl)
         .addFields(
           { name: 'User ID', value: profile.id.toString(), inline: true },
-          { name: 'Account Created', value: new Date(profile.created).toDateString(), inline: true },
+          { name: 'Status', value: status, inline: true },
+          { name: 'Account Created', value: new Date(profile.created).toDateString() },
+          { name: 'Followers', value: followers.count.toString(), inline: true },
+          { name: 'Following', value: following.count.toString(), inline: true },
+          { name: 'Friends', value: friends.count.toString(), inline: true },
           { name: 'Description', value: profile.description || 'No description.' }
         )
         .setURL(`https://www.roblox.com/users/${profile.id}/profile`)
-        .setFooter({ text: 'Roblox Profile Lookup' })
+        .setFooter({ text: 'Advanced Roblox Lookup' })
         .setTimestamp();
 
-      return interaction.reply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed] });
 
     } catch (err) {
       console.error(err);
-      return interaction.reply({ content: 'Error fetching Roblox data.', ephemeral: true });
+      return interaction.editReply('Error fetching Roblox data.');
     }
   }
 });
