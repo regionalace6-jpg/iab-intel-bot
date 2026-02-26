@@ -15,40 +15,34 @@ const client = new Client({
     ]
 });
 
-const PREFIX = "!";
+const PREFIX = "B";
 
 /*
-=====================================
- INTELLIGENCE UI BUILDER
-=====================================
+==============================
+ UI BUILDER
+==============================
 */
 
-function IntelligencePanel(title, fields = [], description = "") {
+function IntelPanel(title, desc = "", fields = []) {
 
     return new EmbedBuilder()
         .setTitle(`🟥 INTELLIGENCE BUREAU | ${title}`)
-        .setDescription(description)
+        .setDescription(desc)
         .addFields(fields)
-        .setColor("#000000") // FULL INTELLIGENCE BLACK THEME
+        .setColor("#000000")
         .setTimestamp()
-        .setFooter({
-            text: "Elite Intelligence Bureau Network"
-        });
+        .setFooter({ text: "OPT Intelligence Network" });
 }
 
 /*
-=====================================
- COMMAND DATABASE
-=====================================
+==============================
+ COMMANDS
+==============================
 */
 
 const commands = {};
 
-/*
-=====================================
- HELP MENU
-=====================================
-*/
+/* ---------- HELP MENU ---------- */
 
 commands.help = async (msg) => {
 
@@ -57,17 +51,16 @@ commands.help = async (msg) => {
             .setCustomId("help_menu")
             .setPlaceholder("Select Intelligence Category")
             .addOptions([
-                { label: "👤 User Intelligence", value: "user" },
-                { label: "🎮 Roblox Intelligence", value: "roblox" },
+                { label: "👤 User Intel", value: "user" },
+                { label: "🎮 Roblox Intel", value: "roblox" },
                 { label: "🌍 OSINT Tools", value: "osint" },
-                { label: "🤖 Utilities", value: "util" }
+                { label: "🤖 Utility", value: "util" }
             ])
     );
 
-    const embed = IntelligencePanel(
-        "Command Center",
-        [],
-        "Select intelligence category below"
+    const embed = IntelPanel(
+        "OPT Intelligence Command Center",
+        "Select category below"
     );
 
     const sent = await msg.reply({
@@ -92,27 +85,35 @@ commands.help = async (msg) => {
         switch (interaction.values[0]) {
 
             case "user":
-                response = IntelligencePanel("User Intelligence", [
-                    { name: "Commands", value: "!userinfo | !avatar" }
-                ]);
+                response = IntelPanel("User Intelligence",
+                    "",
+                    [
+                        { name: "Commands", value: "Buserinfo | Bavatar" }
+                    ]);
                 break;
 
             case "roblox":
-                response = IntelligencePanel("Roblox Intelligence", [
-                    { name: "Commands", value: "!robloxinfo" }
-                ]);
+                response = IntelPanel("Roblox Intelligence",
+                    "",
+                    [
+                        { name: "Commands", value: "Brobloxinfo" }
+                    ]);
                 break;
 
             case "osint":
-                response = IntelligencePanel("OSINT Network", [
-                    { name: "Commands", value: "!iplookup | !dnslookup | !weather" }
-                ]);
+                response = IntelPanel("OSINT Intelligence",
+                    "",
+                    [
+                        { name: "Commands", value: "Biplookup | Bdnslookup | Bweather" }
+                    ]);
                 break;
 
             case "util":
-                response = IntelligencePanel("Utilities", [
-                    { name: "Commands", value: "!ping | !iq | !help" }
-                ]);
+                response = IntelPanel("Utilities",
+                    "",
+                    [
+                        { name: "Commands", value: "Bping | Bhelp | Biq" }
+                    ]);
                 break;
         }
 
@@ -124,14 +125,10 @@ commands.help = async (msg) => {
     });
 };
 
-/*
-=====================================
- BASIC COMMANDS
-=====================================
-*/
+/* ---------- BASIC ---------- */
 
 commands.ping = async msg => {
-    msg.reply(`🏓 Intelligence Latency: ${client.ws.ping}ms`);
+    msg.reply(`🏴 Intelligence Latency: ${client.ws.ping}ms`);
 };
 
 commands.avatar = async msg => {
@@ -145,11 +142,7 @@ commands.iq = async msg => {
     msg.reply(`🧠 Intelligence Rating: ${Math.floor(Math.random() * 100) + 1}`);
 };
 
-/*
-=====================================
- USER INTELLIGENCE
-=====================================
-*/
+/* ---------- USER INTEL ---------- */
 
 commands.userinfo = async (msg, args) => {
 
@@ -161,24 +154,22 @@ commands.userinfo = async (msg, args) => {
         } catch {}
     }
 
-    const ageDays = Math.floor(
+    const age = Math.floor(
         (Date.now() - user.createdTimestamp) / 86400000
     );
 
-    const embed = IntelligencePanel("Subject Profile", [
-        { name: "Username", value: user.tag, inline: true },
-        { name: "ID", value: user.id, inline: true },
-        { name: "Account Age", value: `${ageDays} days`, inline: true }
-    ]);
+    const embed = IntelPanel("Subject Profile",
+        "",
+        [
+            { name: "Username", value: user.tag, inline: true },
+            { name: "ID", value: user.id, inline: true },
+            { name: "Account Age", value: `${age} days`, inline: true }
+        ]);
 
     msg.reply({ embeds: [embed] });
 };
 
-/*
-=====================================
- ROBLOX INTELLIGENCE
-=====================================
-*/
+/* ---------- ROBLOX INTEL ---------- */
 
 commands.robloxinfo = async (msg, args) => {
 
@@ -205,7 +196,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("Roblox subject not found");
+                return msg.reply("User not found");
 
             target = data.data[0].id;
         }
@@ -214,11 +205,13 @@ commands.robloxinfo = async (msg, args) => {
             `https://users.roblox.com/v1/users/${target}`
         ).then(r => r.json());
 
-        const embed = IntelligencePanel("Roblox Profile", [
-            { name: "Username", value: info.name || "Unknown" },
-            { name: "Display", value: info.displayName || "Unknown" },
-            { name: "Created", value: new Date(info.created).toDateString() }
-        ]);
+        const embed = IntelPanel("Roblox Profile",
+            "",
+            [
+                { name: "Username", value: info.name || "Unknown" },
+                { name: "Display", value: info.displayName || "Unknown" },
+                { name: "Created", value: new Date(info.created).toDateString() }
+            ]);
 
         msg.reply({ embeds: [embed] });
 
@@ -227,11 +220,7 @@ commands.robloxinfo = async (msg, args) => {
     }
 };
 
-/*
-=====================================
- OSINT NETWORK TOOLS
-=====================================
-*/
+/* ---------- OSINT ---------- */
 
 commands.iplookup = async (msg, args) => {
 
@@ -243,12 +232,14 @@ commands.iplookup = async (msg, args) => {
             `http://ip-api.com/json/${args[0]}`
         ).then(r => r.json());
 
-        const embed = IntelligencePanel("Geo Intelligence", [
-            { name: "Country", value: data.country || "Unknown" },
-            { name: "Region", value: data.regionName || "Unknown" },
-            { name: "City", value: data.city || "Unknown" },
-            { name: "ISP", value: data.isp || "Unknown" }
-        ]);
+        const embed = IntelPanel("Geo Intelligence",
+            "",
+            [
+                { name: "Country", value: data.country || "Unknown" },
+                { name: "Region", value: data.regionName || "Unknown" },
+                { name: "City", value: data.city || "Unknown" },
+                { name: "ISP", value: data.isp || "Unknown" }
+            ]);
 
         msg.reply({ embeds: [embed] });
 
@@ -269,47 +260,14 @@ commands.dnslookup = async (msg, args) => {
 
         const records = data.Answer?.map(r => r.data).join("\n") || "No records";
 
-        const embed = IntelligencePanel("DNS Intelligence", [
-            { name: "Domain", value: args[0] },
-            { name: "Records", value: records.substring(0, 1000) }
-        ]);
-
-        msg.reply({ embeds: [embed] });
+        msg.reply("```\n" + records.substring(0, 1800) + "\n```");
 
     } catch {
         msg.reply("DNS scan failed");
     }
 };
 
-commands.weather = async (msg, args) => {
-
-    if (!args[0]) return msg.reply("Provide city");
-
-    try {
-
-        const data = await fetch(
-            `https://wttr.in/${args[0]}?format=j1`
-        ).then(r => r.json());
-
-        const current = data.current_condition[0];
-
-        const embed = IntelligencePanel("Weather Intelligence", [
-            { name: "Temperature", value: current.temp_C + "°C" },
-            { name: "Humidity", value: current.humidity + "%" }
-        ]);
-
-        msg.reply({ embeds: [embed] });
-
-    } catch {
-        msg.reply("Weather scan failed");
-    }
-};
-
-/*
-=====================================
- MESSAGE HANDLER
-=====================================
-*/
+/* ---------- MESSAGE HANDLER ---------- */
 
 client.on("messageCreate", async msg => {
 
@@ -329,7 +287,7 @@ client.on("messageCreate", async msg => {
 });
 
 client.once("ready", () => {
-    console.log(`🟥 Intelligence Bureau Online | ${client.user.tag}`);
+    console.log(`🟥 OPT Intelligence Online | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
