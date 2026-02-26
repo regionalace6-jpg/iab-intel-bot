@@ -1,5 +1,4 @@
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
-const axios = require("axios");
 
 const client = new Client({
     intents: [
@@ -13,14 +12,38 @@ const client = new Client({
 const PREFIX = "!";
 
 // =============================
-// READY EVENT
+// READY
 // =============================
 client.once("ready", () => {
-    console.log(`✅ Bureau Bot Online as ${client.user.tag}`);
+    console.log(`🛡 Bureau Bot Online as ${client.user.tag}`);
 });
 
 // =============================
-// MESSAGE HANDLER
+// AUTO ALT RISK ALERT ON JOIN
+// =============================
+client.on("guildMemberAdd", async (member) => {
+    const accountAgeDays = Math.floor(
+        (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24)
+    );
+
+    if (accountAgeDays < 7) {
+        const channel = member.guild.systemChannel;
+        if (!channel) return;
+
+        const embed = new EmbedBuilder()
+            .setTitle("⚠️ New Account Alert")
+            .setColor(0xff0000)
+            .setDescription(`${member.user.tag} joined with a VERY new account.`)
+            .addFields(
+                { name: "Account Age", value: `${accountAgeDays} days` }
+            );
+
+        channel.send({ embeds: [embed] });
+    }
+});
+
+// =============================
+// COMMAND HANDLER
 // =============================
 client.on("messageCreate", async (message) => {
     if (!message.content.startsWith(PREFIX) || message.author.bot) return;
@@ -29,7 +52,7 @@ client.on("messageCreate", async (message) => {
     const command = args.shift().toLowerCase();
 
     // =====================================================
-    // 🔎 ALT RISK SCAN (Legal Bureau Version)
+    // 🔎 ALT RISK SCAN
     // =====================================================
     if (command === "altscan") {
         const member = message.mentions.members.first();
@@ -53,7 +76,7 @@ client.on("messageCreate", async (message) => {
 
         if (accountAgeDays < 30) {
             riskScore += 20;
-            flags.push("Recently created account");
+            flags.push("Recently created");
         }
 
         if (/alt|test|temp|123/i.test(member.user.username)) {
@@ -91,49 +114,57 @@ client.on("messageCreate", async (message) => {
     }
 
     // =====================================================
-    // 🎮 ROBLOX USER INFO
+    // 🎮 ROBLOX USER INFO (NATIVE FETCH)
     // =====================================================
     if (command === "robloxinfo") {
         if (!args[0]) return message.reply("Provide a Roblox username.");
 
         try {
-            const userRes = await axios.post(
+            const userRes = await fetch(
                 "https://users.roblox.com/v1/usernames/users",
                 {
-                    usernames: [args[0]],
-                    excludeBannedUsers: false
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        usernames: [args[0]],
+                        excludeBannedUsers: false
+                    })
                 }
             );
 
-            if (!userRes.data.data.length)
+            const userData = await userRes.json();
+            if (!userData.data.length)
                 return message.reply("Roblox user not found.");
 
-            const user = userRes.data.data[0];
+            const user = userData.data[0];
 
-            const userInfo = await axios.get(
+            const userInfoRes = await fetch(
                 `https://users.roblox.com/v1/users/${user.id}`
             );
+
+            const userInfo = await userInfoRes.json();
 
             const embed = new EmbedBuilder()
                 .setTitle("🎮 Roblox User Information")
                 .setColor(0x0099ff)
                 .addFields(
-                    { name: "Username", value: userInfo.data.name, inline: true },
-                    { name: "Display Name", value: userInfo.data.displayName, inline: true },
-                    { name: "User ID", value: `${userInfo.data.id}`, inline: true },
-                    { name: "Created", value: new Date(userInfo.data.created).toDateString() },
-                    { name: "Banned", value: `${userInfo.data.isBanned}` }
+                    { name: "Username", value: userInfo.name, inline: true },
+                    { name: "Display Name", value: userInfo.displayName, inline: true },
+                    { name: "User ID", value: `${userInfo.id}`, inline: true },
+                    { name: "Created", value: new Date(userInfo.created).toDateString() },
+                    { name: "Banned", value: `${userInfo.isBanned}` }
                 );
 
             return message.reply({ embeds: [embed] });
 
         } catch (err) {
+            console.error(err);
             return message.reply("Error fetching Roblox data.");
         }
     }
 
     // =====================================================
-    // 👤 DISCORD USER INFO
+    // 👤 USER INFO
     // =====================================================
     if (command === "userinfo") {
         const member = message.mentions.members.first() || message.member;
@@ -175,6 +206,6 @@ client.on("messageCreate", async (message) => {
 });
 
 // =============================
-// LOGIN (USES YOUR HOST VARIABLES)
+// LOGIN (USES YOUR HOST TOKEN VARIABLE)
 // =============================
 client.login(process.env.TOKEN);
