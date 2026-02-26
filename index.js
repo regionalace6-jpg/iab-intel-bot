@@ -10,9 +10,9 @@ const {
   ActionRowBuilder
 } = require('discord.js');
 
-const TOKEN = 'YOUR_BOT_TOKEN';
-const CLIENT_ID = 'YOUR_CLIENT_ID';
-const GUILD_ID = 'YOUR_GUILD_ID';
+const TOKEN = 'MTQ3NjUxOTk0Nzk2OTQ5OTE2Ng.GiU7E7.VtRA9pt7CIZITuqG8ueN1RI2YmsRp5zo_c3rGQ';
+const CLIENT_ID = '1476519947969499166';
+const GUILD_ID = '1472113817722028197';
 
 const client = new Client({
   intents: [
