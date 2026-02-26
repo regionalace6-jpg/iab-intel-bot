@@ -1,175 +1,180 @@
-const {
-  Client,
-  GatewayIntentBits,
-  EmbedBuilder,
-  REST,
-  Routes,
-  SlashCommandBuilder
-} = require('discord.js');
-
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-
-const TOKEN = process.env.TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-const GUILD_ID = process.env.GUILD_ID;
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const axios = require("axios");
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers
-  ]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-const commands = [
-  new SlashCommandBuilder()
-    .setName('userinfo')
-    .setDescription('Get Discord user info')
-    .addUserOption(option =>
-      option.setName('user')
-        .setDescription('Select a user')
-        .setRequired(false)
-    ),
+const PREFIX = "!";
 
-  new SlashCommandBuilder()
-    .setName('roblox')
-    .setDescription('Get advanced Roblox user info')
-    .addStringOption(option =>
-      option.setName('username')
-        .setDescription('Roblox username')
-        .setRequired(true)
-    )
-].map(cmd => cmd.toJSON());
-
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-
-(async () => {
-  try {
-    console.log('Registering slash commands...');
-    await rest.put(
-      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-      { body: commands }
-    );
-    console.log('Slash commands registered.');
-  } catch (error) {
-    console.error(error);
-  }
-})();
-
-client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
+// =============================
+// READY EVENT
+// =============================
+client.once("ready", () => {
+    console.log(`✅ Bureau Bot Online as ${client.user.tag}`);
 });
 
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+// =============================
+// MESSAGE HANDLER
+// =============================
+client.on("messageCreate", async (message) => {
+    if (!message.content.startsWith(PREFIX) || message.author.bot) return;
 
-  // ================= DISCORD USERINFO =================
-  if (interaction.commandName === 'userinfo') {
-    const user = interaction.options.getUser('user') || interaction.user;
-    const member = await interaction.guild.members.fetch(user.id);
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
 
-    const badges = user.flags?.toArray() || [];
-    const badgeList = badges.length > 0 ? badges.join(', ') : 'Hidden / None';
+    // =====================================================
+    // 🔎 ALT RISK SCAN (Legal Bureau Version)
+    // =====================================================
+    if (command === "altscan") {
+        const member = message.mentions.members.first();
+        if (!member) return message.reply("Mention a user to scan.");
 
-    const roles = member.roles.cache
-      .filter(role => role.id !== interaction.guild.id)
-      .map(role => role.toString())
-      .join(', ') || 'None';
+        const accountAgeDays = Math.floor(
+            (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24)
+        );
 
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL({ dynamic: true }) })
-      .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 512 }))
-      .addFields(
-        { name: 'User ID', value: user.id, inline: true },
-        { name: 'Bot?', value: user.bot ? 'Yes' : 'No', inline: true },
-        { name: 'Account Created', value: `<t:${Math.floor(user.createdTimestamp / 1000)}:F>` },
-        { name: 'Joined Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>` },
-        { name: 'Nickname', value: member.nickname || 'None', inline: true },
-        { name: 'Badges', value: badgeList },
-        { name: `Roles (${member.roles.cache.size - 1})`, value: roles }
-      )
-      .setTimestamp();
+        const joinAgeDays = Math.floor(
+            (Date.now() - member.joinedTimestamp) / (1000 * 60 * 60 * 24)
+        );
 
-    return interaction.reply({ embeds: [embed] });
-  }
+        let riskScore = 0;
+        let flags = [];
 
-  // ================= ADVANCED ROBLOX =================
-  if (interaction.commandName === 'roblox') {
+        if (accountAgeDays < 7) {
+            riskScore += 40;
+            flags.push("Very new account");
+        }
 
-    const username = interaction.options.getString('username');
+        if (accountAgeDays < 30) {
+            riskScore += 20;
+            flags.push("Recently created account");
+        }
 
-    try {
-      await interaction.deferReply();
+        if (/alt|test|temp|123/i.test(member.user.username)) {
+            riskScore += 20;
+            flags.push("Suspicious username pattern");
+        }
 
-      // Get User ID
-      const userRes = await fetch('https://users.roblox.com/v1/usernames/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
-      });
+        if (joinAgeDays === 0) {
+            riskScore += 20;
+            flags.push("Joined today");
+        }
 
-      const userData = await userRes.json();
-      if (!userData.data || !userData.data[0]) {
-        return interaction.editReply('User not found.');
-      }
+        let riskLevel = "Low";
+        if (riskScore >= 60) riskLevel = "High";
+        else if (riskScore >= 30) riskLevel = "Medium";
 
-      const robloxUser = userData.data[0];
+        const embed = new EmbedBuilder()
+            .setTitle("🛡 Bureau Alt Risk Analysis")
+            .setColor(
+                riskLevel === "High" ? 0xff0000 :
+                riskLevel === "Medium" ? 0xff9900 :
+                0x00ff00
+            )
+            .addFields(
+                { name: "User", value: member.user.tag, inline: true },
+                { name: "Account Age", value: `${accountAgeDays} days`, inline: true },
+                { name: "Joined Server", value: `${joinAgeDays} days ago`, inline: true },
+                { name: "Risk Score", value: `${riskScore}/100`, inline: true },
+                { name: "Risk Level", value: riskLevel, inline: true },
+                { name: "Flags", value: flags.length ? flags.join("\n") : "None detected" }
+            )
+            .setThumbnail(member.user.displayAvatarURL());
 
-      // Profile
-      const profile = await (await fetch(`https://users.roblox.com/v1/users/${robloxUser.id}`)).json();
-
-      // Followers
-      const followers = await (await fetch(`https://friends.roblox.com/v1/users/${robloxUser.id}/followers/count`)).json();
-
-      // Following
-      const following = await (await fetch(`https://friends.roblox.com/v1/users/${robloxUser.id}/followings/count`)).json();
-
-      // Friends
-      const friends = await (await fetch(`https://friends.roblox.com/v1/users/${robloxUser.id}/friends/count`)).json();
-
-      // Presence
-      const presenceRes = await fetch('https://presence.roblox.com/v1/presence/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: [robloxUser.id] })
-      });
-      const presenceData = await presenceRes.json();
-
-      const presenceType = presenceData.userPresences[0]?.userPresenceType;
-
-      let status = "Offline";
-      if (presenceType === 1) status = "Online";
-      if (presenceType === 2) status = "In Game";
-
-      // Avatar
-      const avatarRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png&isCircular=false`);
-      const avatarData = await avatarRes.json();
-      const avatarUrl = avatarData.data[0].imageUrl;
-
-      const embed = new EmbedBuilder()
-        .setColor(0x00A2FF)
-        .setAuthor({ name: `${profile.displayName} (@${profile.name})` })
-        .setThumbnail(avatarUrl)
-        .addFields(
-          { name: 'User ID', value: profile.id.toString(), inline: true },
-          { name: 'Status', value: status, inline: true },
-          { name: 'Account Created', value: new Date(profile.created).toDateString() },
-          { name: 'Followers', value: followers.count.toString(), inline: true },
-          { name: 'Following', value: following.count.toString(), inline: true },
-          { name: 'Friends', value: friends.count.toString(), inline: true },
-          { name: 'Description', value: profile.description || 'No description.' }
-        )
-        .setURL(`https://www.roblox.com/users/${profile.id}/profile`)
-        .setFooter({ text: 'Advanced Roblox Lookup' })
-        .setTimestamp();
-
-      return interaction.editReply({ embeds: [embed] });
-
-    } catch (err) {
-      console.error(err);
-      return interaction.editReply('Error fetching Roblox data.');
+        return message.reply({ embeds: [embed] });
     }
-  }
+
+    // =====================================================
+    // 🎮 ROBLOX USER INFO
+    // =====================================================
+    if (command === "robloxinfo") {
+        if (!args[0]) return message.reply("Provide a Roblox username.");
+
+        try {
+            const userRes = await axios.post(
+                "https://users.roblox.com/v1/usernames/users",
+                {
+                    usernames: [args[0]],
+                    excludeBannedUsers: false
+                }
+            );
+
+            if (!userRes.data.data.length)
+                return message.reply("Roblox user not found.");
+
+            const user = userRes.data.data[0];
+
+            const userInfo = await axios.get(
+                `https://users.roblox.com/v1/users/${user.id}`
+            );
+
+            const embed = new EmbedBuilder()
+                .setTitle("🎮 Roblox User Information")
+                .setColor(0x0099ff)
+                .addFields(
+                    { name: "Username", value: userInfo.data.name, inline: true },
+                    { name: "Display Name", value: userInfo.data.displayName, inline: true },
+                    { name: "User ID", value: `${userInfo.data.id}`, inline: true },
+                    { name: "Created", value: new Date(userInfo.data.created).toDateString() },
+                    { name: "Banned", value: `${userInfo.data.isBanned}` }
+                );
+
+            return message.reply({ embeds: [embed] });
+
+        } catch (err) {
+            return message.reply("Error fetching Roblox data.");
+        }
+    }
+
+    // =====================================================
+    // 👤 DISCORD USER INFO
+    // =====================================================
+    if (command === "userinfo") {
+        const member = message.mentions.members.first() || message.member;
+
+        const embed = new EmbedBuilder()
+            .setTitle("👤 Discord User Information")
+            .setColor(0x5865F2)
+            .addFields(
+                { name: "Username", value: member.user.tag, inline: true },
+                { name: "User ID", value: member.user.id, inline: true },
+                { name: "Account Created", value: new Date(member.user.createdTimestamp).toDateString() },
+                { name: "Joined Server", value: new Date(member.joinedTimestamp).toDateString() },
+                { name: "Roles", value: member.roles.cache.map(r => r.name).join(", ") }
+            )
+            .setThumbnail(member.user.displayAvatarURL());
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    // =====================================================
+    // 🏢 SERVER INFO
+    // =====================================================
+    if (command === "serverinfo") {
+        const guild = message.guild;
+
+        const embed = new EmbedBuilder()
+            .setTitle("🏢 Server Information")
+            .setColor(0x00ffff)
+            .addFields(
+                { name: "Server Name", value: guild.name, inline: true },
+                { name: "Server ID", value: guild.id, inline: true },
+                { name: "Owner", value: `<@${guild.ownerId}>`, inline: true },
+                { name: "Member Count", value: `${guild.memberCount}`, inline: true },
+                { name: "Created On", value: new Date(guild.createdTimestamp).toDateString() }
+            );
+
+        return message.reply({ embeds: [embed] });
+    }
 });
 
-client.login(TOKEN);
+// =============================
+// LOGIN (USES YOUR HOST VARIABLES)
+// =============================
+client.login(process.env.TOKEN);
