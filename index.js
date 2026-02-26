@@ -156,4 +156,5 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+console.log("TOKEN ENV:", process.env.TOKEN);
 client.login(TOKEN);
