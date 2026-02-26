@@ -26,13 +26,12 @@ function Panel(title, fields = []) {
         .setTitle(`🟥 INTELLIGENCE PROPERTY | ${title}`)
         .addFields(fields)
         .setColor("#000000")
-        .setTimestamp()
-        .setFooter({ text: "Intelligence Property Network" });
+        .setTimestamp();
 }
 
 /*
 =====================================
- COMMAND DATABASE
+ COMMANDS
 =====================================
 */
 
@@ -47,7 +46,7 @@ const commands = {};
 commands.help = async msg => {
 
     const helpText = `
-🟥 INTELLIGENCE PROPERTY
+🟥 INTELLIGENCE PROPERTY COMMANDS
 
 USER
 *userinfo <id>
@@ -82,16 +81,16 @@ commands.ping = async msg => {
 };
 
 commands.iq = async msg => {
-    msg.reply(`🧠 IQ Score: ${Math.floor(Math.random() * 100) + 1}`);
+    msg.reply(`🧠 IQ: ${Math.floor(Math.random() * 100) + 1}`);
 };
 
 commands.quote = async msg => {
 
     const quotes = [
-        "Knowledge is power",
-        "Intelligence wins silently",
+        "Intelligence is power",
+        "Data is modern warfare",
         "Observe before acting",
-        "Data is modern warfare"
+        "Knowledge wins silently"
     ];
 
     msg.reply("🧠 " + quotes[Math.floor(Math.random() * quotes.length)]);
@@ -99,7 +98,7 @@ commands.quote = async msg => {
 
 /*
 =====================================
- USER INTEL
+ DISCORD INTEL
 =====================================
 */
 
@@ -117,11 +116,15 @@ commands.userinfo = async (msg, args) => {
         (Date.now() - user.createdTimestamp) / 86400000
     );
 
-    const embed = Panel("User Intelligence", [
-        { name: "Username", value: user.tag },
-        { name: "User ID", value: user.id },
-        { name: "Account Age", value: age + " days" }
-    ]);
+    const embed = new EmbedBuilder()
+        .setTitle("🟥 Discord Intelligence Profile")
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .addFields([
+            { name: "Username", value: user.tag },
+            { name: "User ID", value: user.id },
+            { name: "Account Age", value: age + " days" }
+        ])
+        .setColor("#000000");
 
     msg.reply({ embeds: [embed] });
 };
@@ -130,7 +133,7 @@ commands.avatar = async msg => {
 
     let user = msg.mentions.users.first() || msg.author;
 
-    msg.reply(user.displayAvatarURL({ dynamic: true, size: 512 }));
+    msg.reply(user.displayAvatarURL({ size: 512 }));
 };
 
 /*
@@ -164,7 +167,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("Roblox user not found");
+                return msg.reply("User not found");
 
             target = data.data[0].id;
         }
@@ -173,16 +176,21 @@ commands.robloxinfo = async (msg, args) => {
             `https://users.roblox.com/v1/users/${target}`
         ).then(r => r.json());
 
-        const embed = Panel("Roblox Intelligence", [
-            { name: "Username", value: info.name || "Unknown" },
-            { name: "Display", value: info.displayName || "Unknown" },
-            { name: "Created", value: new Date(info.created).toDateString() }
-        ]);
+        const avatar = `https://www.roblox.com/headshot-thumbnail/image?userId=${target}&width=420&height=420&format=png`;
+
+        const embed = new EmbedBuilder()
+            .setTitle("🟥 Roblox Intelligence Profile")
+            .setThumbnail(avatar)
+            .addFields([
+                { name: "Username", value: info.name || "Unknown" },
+                { name: "Display Name", value: info.displayName || "Unknown" },
+                { name: "Created", value: new Date(info.created).toDateString() }
+            ])
+            .setColor("#000000");
 
         msg.reply({ embeds: [embed] });
 
-    } catch (err) {
-        console.error(err);
+    } catch {
         msg.reply("Roblox scan failed");
     }
 };
@@ -198,7 +206,7 @@ commands.robloxavatar = async (msg, args) => {
 
 /*
 =====================================
- OSINT
+ OSINT TOOLS
 =====================================
 */
 
@@ -206,56 +214,38 @@ commands.iplookup = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide IP");
 
-    try {
+    const data = await fetch(
+        `http://ip-api.com/json/${args[0]}`
+    ).then(r => r.json());
 
-        const data = await fetch(
-            `http://ip-api.com/json/${args[0]}`
-        ).then(r => r.json());
-
-        msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
-
-    } catch {
-        msg.reply("IP lookup failed");
-    }
+    msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
 };
 
 commands.dnslookup = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide domain");
 
-    try {
+    const data = await fetch(
+        `https://dns.google/resolve?name=${args[0]}`
+    ).then(r => r.json());
 
-        const data = await fetch(
-            `https://dns.google/resolve?name=${args[0]}`
-        ).then(r => r.json());
-
-        msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
-
-    } catch {
-        msg.reply("DNS lookup failed");
-    }
+    msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
 };
 
 commands.domaininfo = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide domain");
 
-    try {
+    const data = await fetch(
+        `https://api.hackertarget.com/whois/?q=${args[0]}`
+    ).then(r => r.text());
 
-        const data = await fetch(
-            `https://api.hackertarget.com/whois/?q=${args[0]}`
-        ).then(r => r.text());
-
-        msg.reply("```\n" + data.substring(0, 1800) + "\n```");
-
-    } catch {
-        msg.reply("Domain scan failed");
-    }
+    msg.reply("```\n" + data.substring(0, 1800) + "\n```");
 };
 
 /*
 =====================================
- MESSAGE HANDLER (CRASH PROTECTED)
+ MESSAGE HANDLER
 =====================================
 */
 
@@ -277,14 +267,14 @@ client.on("messageCreate", async msg => {
 
     } catch (err) {
         console.error(err);
-        msg.reply("Command execution error");
+        msg.reply("Command execution failed");
     }
 
 });
 
 /*
 =====================================
- READY EVENT
+ READY
 =====================================
 */
 
