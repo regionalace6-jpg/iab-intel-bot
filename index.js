@@ -1,4 +1,10 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const {
+    Client,
+    GatewayIntentBits,
+    EmbedBuilder,
+    ActionRowBuilder,
+    StringSelectMenuBuilder
+} = require("discord.js");
 
 const client = new Client({
     intents: [
@@ -20,57 +26,113 @@ const PREFIX = "!";
 function Panel(title, fields = []) {
 
     return new EmbedBuilder()
-        .setTitle(`🟥 INTELLIGENCE CENTER | ${title}`)
+        .setTitle(`🟥 INTELLIGENCE NETWORK | ${title}`)
         .addFields(fields)
-        .setColor("#ff0000")
+        .setColor("Red")
         .setTimestamp()
         .setFooter({
-            text: "Intelligence Bureau Network"
+            text: "Bureau Intelligence Network"
         });
 }
 
 /*
 =====================================
- COMMAND DATABASE
+ RAID MEMORY ANALYTICS
+=====================================
+*/
+
+let joinMemory = [];
+
+/*
+=====================================
+ COMMANDS
 =====================================
 */
 
 const commands = {};
 
-/*
-=====================================
- HELP COMMAND (GOATED UI)
-=====================================
-*/
+/* -------- HELP MENU -------- */
 
 commands.help = async (msg) => {
 
-    const embed = Panel("Command List", [
-        { name: "👤 User Intelligence", value: "!userinfo — Show user profile intelligence" },
-        { name: "🎮 Roblox Intelligence", value: "!robloxinfo — Show Roblox profile data" },
-        { name: "🌍 Geo Intelligence", value: "!iplookup — Public IP location scan" },
-        { name: "🤖 Utility", value: "!ping — Bot latency\n!avatar — Profile picture\n!serverinfo — Server data" },
-        { name: "🧠 Analysis", value: "!iq — Intelligence rating\n!aura — Aura rating" }
+    const menu = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId("help_menu")
+            .setPlaceholder("Select Intelligence Category")
+            .addOptions([
+                { label: "👤 User Intel", value: "user" },
+                { label: "🎮 Roblox Intel", value: "roblox" },
+                { label: "🌍 OSINT Tools", value: "osint" },
+                { label: "🤖 Utilities", value: "util" }
+            ])
+    );
+
+    const embed = Panel("Command Network", [
+        { name: "System", value: "Select category below" }
     ]);
 
-    msg.reply({ embeds: [embed] });
+    const sent = await msg.reply({
+        embeds: [embed],
+        components: [menu]
+    });
+
+    const collector = sent.createMessageComponentCollector({
+        time: 60000
+    });
+
+    collector.on("collect", async interaction => {
+
+        if (interaction.user.id !== msg.author.id)
+            return interaction.reply({
+                content: "Not your menu",
+                ephemeral: true
+            });
+
+        let response;
+
+        switch (interaction.values[0]) {
+
+            case "user":
+                response = Panel("User Intelligence", [
+                    { name: "Commands", value: "!userinfo | !avatar" }
+                ]);
+                break;
+
+            case "roblox":
+                response = Panel("Roblox Intelligence", [
+                    { name: "Commands", value: "!robloxinfo" }
+                ]);
+                break;
+
+            case "osint":
+                response = Panel("OSINT Tools", [
+                    { name: "Commands", value: "!iplookup" }
+                ]);
+                break;
+
+            case "util":
+                response = Panel("Utilities", [
+                    { name: "Commands", value: "!ping | !help" }
+                ]);
+                break;
+        }
+
+        interaction.update({
+            embeds: [response],
+            components: [menu]
+        });
+
+    });
+
 };
 
-/*
-=====================================
- PING
-=====================================
-*/
+/* -------- PING -------- */
 
 commands.ping = async (msg) => {
-    msg.reply(`🏓 Command Center Latency: ${client.ws.ping}ms`);
+    msg.reply(`🏓 ${client.ws.ping}ms`);
 };
 
-/*
-=====================================
- AVATAR
-=====================================
-*/
+/* -------- AVATAR -------- */
 
 commands.avatar = async (msg) => {
 
@@ -81,11 +143,7 @@ commands.avatar = async (msg) => {
     );
 };
 
-/*
-=====================================
- USER INTEL
-=====================================
-*/
+/* -------- USER INFO -------- */
 
 commands.userinfo = async (msg, args) => {
 
@@ -101,20 +159,16 @@ commands.userinfo = async (msg, args) => {
         (Date.now() - user.createdTimestamp) / 86400000
     );
 
-    const embed = Panel("Subject Intelligence Report", [
+    const embed = Panel("Subject Profile", [
         { name: "Username", value: user.tag, inline: true },
-        { name: "User ID", value: user.id, inline: true },
+        { name: "ID", value: user.id, inline: true },
         { name: "Account Age", value: `${ageDays} days`, inline: true }
     ]).setThumbnail(user.displayAvatarURL({ dynamic: true }));
 
     msg.reply({ embeds: [embed] });
 };
 
-/*
-=====================================
- ROBLOX INTEL
-=====================================
-*/
+/* -------- ROBLOX INFO -------- */
 
 commands.robloxinfo = async (msg, args) => {
 
@@ -141,7 +195,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("Roblox subject not found");
+                return msg.reply("Roblox user not found");
 
             target = data.data[0].id;
         }
@@ -150,7 +204,7 @@ commands.robloxinfo = async (msg, args) => {
             `https://users.roblox.com/v1/users/${target}`
         ).then(r => r.json());
 
-        const embed = Panel("Roblox Subject Profile", [
+        const embed = Panel("Roblox Profile", [
             { name: "Username", value: info.name || "Unknown" },
             { name: "Display", value: info.displayName || "Unknown" },
             { name: "Created", value: new Date(info.created).toDateString() }
@@ -159,15 +213,11 @@ commands.robloxinfo = async (msg, args) => {
         msg.reply({ embeds: [embed] });
 
     } catch {
-        msg.reply("Roblox intelligence scan failed");
+        msg.reply("Roblox scan failed");
     }
 };
 
-/*
-=====================================
- GEO IP INTEL
-=====================================
-*/
+/* -------- IP LOOKUP (BEST VERSION) -------- */
 
 commands.iplookup = async (msg, args) => {
 
@@ -177,40 +227,28 @@ commands.iplookup = async (msg, args) => {
     try {
 
         const data = await fetch(
-            `https://ipapi.co/${args[0]}/json/`
+            `http://ip-api.com/json/${args[0]}`
         ).then(r => r.json());
 
-        const embed = Panel("Geo Intelligence Scan", [
-            { name: "City", value: data.city || "Unknown" },
-            { name: "Country", value: data.country_name || "Unknown" },
-            { name: "ISP", value: data.org || "Unknown" }
+        const embed = Panel("Geo Intelligence", [
+            { name: "Country", value: data.country || "Unknown", inline: true },
+            { name: "Region", value: data.regionName || "Unknown", inline: true },
+            { name: "City", value: data.city || "Unknown", inline: true },
+            { name: "ISP", value: data.isp || "Unknown", inline: true },
+            { name: "Org", value: data.org || "Unknown", inline: true }
         ]);
 
         msg.reply({ embeds: [embed] });
 
     } catch {
-        msg.reply("Geo scan failed");
+        msg.reply("IP scan failed");
     }
 };
 
-/*
-=====================================
- FUN INTEL
-=====================================
-*/
+/* -------- FUN -------- */
 
 commands.iq = async (msg) => {
-
-    const iq = Math.floor(Math.random() * 100) + 1;
-
-    msg.reply(`🧠 Intelligence Rating: ${iq}`);
-};
-
-commands.aura = async (msg) => {
-
-    const aura = ["Legendary", "Elite", "Sigma", "Unknown"][Math.floor(Math.random() * 4)];
-
-    msg.reply(`✨ Aura Rating: ${aura}`);
+    msg.reply(`🧠 Intelligence Rating: ${Math.floor(Math.random() * 100) + 1}`);
 };
 
 /*
@@ -230,7 +268,7 @@ client.on("messageCreate", async msg => {
         try {
             await commands[cmd](msg, args);
         } catch {
-            msg.reply("Command execution error.");
+            msg.reply("Command error.");
         }
     }
 
@@ -238,12 +276,26 @@ client.on("messageCreate", async msg => {
 
 /*
 =====================================
- READY
+ JOIN INTEL ANALYTICS
 =====================================
 */
 
+client.on("guildMemberAdd", member => {
+
+    joinMemory.push(Date.now());
+
+    joinMemory = joinMemory.filter(
+        t => Date.now() - t < 10000
+    );
+
+    if (joinMemory.length >= 5) {
+        console.log("🚨 Possible raid activity detected");
+    }
+
+});
+
 client.once("ready", () => {
-    console.log(`🟥 INTELLIGENCE CENTER ONLINE | ${client.user.tag}`);
+    console.log(`🟥 Bureau Level 10 Online | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
