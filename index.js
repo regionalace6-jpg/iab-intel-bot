@@ -20,13 +20,13 @@ const PREFIX = "!";
 function Dossier(title, description, fields = []) {
 
     return new EmbedBuilder()
-        .setTitle(`🟥 FBI COMMAND CENTER | ${title}`)
+        .setTitle(`🟥 Intelligence COMMAND CENTER | ${title}`)
         .setDescription(description || "Intelligence Report")
         .addFields(fields)
         .setColor("#ff0000")
         .setTimestamp()
         .setFooter({
-            text: "Federal Intelligence Bureau System"
+            text: "Intelligence Bureau System"
         });
 }
 
