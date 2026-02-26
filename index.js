@@ -1,7 +1,7 @@
-const {
-    Client,
-    GatewayIntentBits,
-    EmbedBuilder
+const { 
+    Client, 
+    GatewayIntentBits, 
+    EmbedBuilder 
 } = require("discord.js");
 
 const client = new Client({
@@ -15,43 +15,116 @@ const client = new Client({
 
 const PREFIX = "!";
 
-// ==============================
-// READY
-// ==============================
+/*
+================================
+ RAID DETECTION MEMORY SYSTEM
+================================
+*/
+
+let joinTimestamps = [];
+
+/*
+================================
+ READY
+================================
+*/
 
 client.once("ready", () => {
-    console.log(`🛡 Intelligence Bureau Online | ${client.user.tag}`);
+    console.log(`🛡 Supreme Bureau Online | ${client.user.tag}`);
 });
 
-// ==============================
-// LOGGING SYSTEM
-// ==============================
+/*
+================================
+ INTELLIGENCE JOIN MONITOR
+================================
+*/
 
 client.on("guildMemberAdd", async member => {
+
     const logGuild = client.guilds.cache.get(process.env.LOG_GUILD_ID);
     if (!logGuild) return;
 
     const logChannel = logGuild.channels.cache.get(process.env.LOG_CHANNEL_ID);
     if (!logChannel) return;
 
-    const daysOld = Math.floor(
-        (Date.now() - member.user.createdTimestamp) / 86400000
-    );
+    try {
 
-    const embed = new EmbedBuilder()
-        .setTitle("🟢 New Member Entry")
-        .setColor(0x00ff00)
-        .addFields(
-            { name: "User", value: member.user.tag },
-            { name: "Account Age", value: `${daysOld} days` }
+        const now = Date.now();
+
+        // Raid detection memory
+        joinTimestamps.push(now);
+
+        // Remove old joins (10 sec window)
+        joinTimestamps = joinTimestamps.filter(t => now - t < 10000);
+
+        let raidWarning = null;
+
+        if (joinTimestamps.length >= 5) {
+            raidWarning = "🚨 RAID DETECTED — Mass joins in 10 seconds!";
+        }
+
+        const accountAgeDays = Math.floor(
+            (now - member.user.createdTimestamp) / 86400000
         );
 
-    logChannel.send({ embeds: [embed] });
+        const joinDate = `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`;
+        const createdDate = `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`;
+
+        let riskScore = 0;
+        let flags = [];
+
+        if (accountAgeDays < 7) {
+            riskScore += 40;
+            flags.push("Very New Account");
+        }
+
+        if (accountAgeDays < 30) {
+            riskScore += 20;
+            flags.push("New Account");
+        }
+
+        if (/temp|test|alt|123|user/i.test(member.user.username)) {
+            riskScore += 20;
+            flags.push("Suspicious Username Pattern");
+        }
+
+        if (!member.user.avatar) {
+            riskScore += 10;
+            flags.push("Default Avatar");
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle("🛡 Supreme Bureau Intelligence Entry")
+            .setColor(riskScore > 50 ? 0xff0000 : 0x00ff00)
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .addFields(
+                { name: "User", value: member.user.tag },
+                { name: "User ID", value: member.user.id },
+                { name: "Join Date", value: joinDate },
+                { name: "Account Created", value: createdDate },
+                { name: "Account Age", value: `${accountAgeDays} days` },
+                { name: "Risk Score", value: `${riskScore}/100` },
+                { name: "Flags", value: flags.join("\n") || "None" }
+            )
+            .setTimestamp();
+
+        if (raidWarning) {
+            embed.addFields({ name: "🚨 Security Alert", value: raidWarning });
+        }
+
+        await logChannel.send({ embeds: [embed] });
+
+    } catch (err) {
+        console.log("Intelligence system error:", err);
+    }
+
 });
 
-// ==============================
-// COMMAND SYSTEM
-// ==============================
+/*
+================================
+ COMMAND SYSTEM
+================================
+*/
 
 client.on("messageCreate", async message => {
 
@@ -60,57 +133,43 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // =============================
-    // USER INFO
-    // =============================
-
+    // USERINFO GLOBAL
     if (command === "userinfo") {
 
-        const member =
-            message.mentions.members.first() ||
-            message.guild.members.cache.get(args[0]) ||
-            message.member;
-
-        const daysOld = Math.floor(
-            (Date.now() - member.user.createdTimestamp) / 86400000
-        );
-
-        const embed = new EmbedBuilder()
-            .setTitle("👤 Intelligence Report")
-            .setColor(0x5865F2)
-            .addFields(
-                { name: "Username", value: member.user.tag },
-                { name: "User ID", value: member.user.id },
-                { name: "Account Age", value: `${daysOld} days` },
-                { name: "Joined Server", value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>` }
-            )
-            .setThumbnail(member.user.displayAvatarURL());
-
-        return message.reply({ embeds: [embed] });
-    }
-
-    // =============================
-    // WHOIS STYLE LOOKUP
-    // =============================
-
-    if (command === "whois") {
-
-        const userId = args[0];
-
-        if (!userId)
-            return message.reply("Provide user ID.");
+        let user =
+            message.mentions.users.first() ||
+            client.users.cache.get(args[0]) ||
+            message.author;
 
         try {
 
-            const user = await client.users.fetch(userId);
+            user = await client.users.fetch(user.id);
+
+            let member = null;
+
+            try {
+                member = await message.guild.members.fetch(user.id);
+            } catch {
+                member = null;
+            }
+
+            const daysOld = Math.floor(
+                (Date.now() - user.createdTimestamp) / 86400000
+            );
 
             const embed = new EmbedBuilder()
-                .setTitle("🧠 WHOIS Intelligence")
+                .setTitle("👤 Bureau User Intelligence")
+                .setColor(0x5865F2)
                 .addFields(
                     { name: "Username", value: user.tag },
-                    { name: "ID", value: user.id },
-                    { name: "Bot", value: `${user.bot}` }
-                );
+                    { name: "User ID", value: user.id },
+                    { name: "Account Age", value: `${daysOld} days` },
+                    {
+                        name: "Server Status",
+                        value: member ? "Member of server" : "Not in server"
+                    }
+                )
+                .setThumbnail(user.displayAvatarURL({ dynamic: true }));
 
             return message.reply({ embeds: [embed] });
 
@@ -119,13 +178,10 @@ client.on("messageCreate", async message => {
         }
     }
 
-    // =============================
-    // ROBLOX INFO
-    // =============================
-
+    // ROBLOX LOOKUP
     if (command === "robloxinfo") {
 
-        if (!args[0]) return message.reply("Provide username or ID.");
+        if (!args[0]) return message.reply("Provide Roblox username or ID.");
 
         try {
 
@@ -160,7 +216,7 @@ client.on("messageCreate", async message => {
             const info = await infoRes.json();
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 Roblox Intelligence Report")
+                .setTitle("🎮 Roblox Intelligence")
                 .addFields(
                     { name: "Username", value: info.name },
                     { name: "Display Name", value: info.displayName },
@@ -175,10 +231,7 @@ client.on("messageCreate", async message => {
         }
     }
 
-    // =============================
-    // IP LOOKUP (PUBLIC ONLY)
-    // =============================
-
+    // IP LOOKUP
     if (command === "iplookup") {
 
         if (!args[0]) return message.reply("Provide IP.");
@@ -202,64 +255,6 @@ client.on("messageCreate", async message => {
         } catch {
             message.reply("IP lookup failed.");
         }
-    }
-
-    // =============================
-    // RISK SCANNER
-    // =============================
-
-    if (command === "riskcheck") {
-
-        const member =
-            message.mentions.members.first() ||
-            message.guild.members.cache.get(args[0]);
-
-        if (!member)
-            return message.reply("Mention or provide user ID.");
-
-        let riskScore = 0;
-        let flags = [];
-
-        const accountAgeDays = Math.floor(
-            (Date.now() - member.user.createdTimestamp) / 86400000
-        );
-
-        if (accountAgeDays < 7) {
-            riskScore += 40;
-            flags.push("Very new account");
-        }
-
-        if (/temp|test|alt|123/i.test(member.user.username)) {
-            riskScore += 20;
-            flags.push("Suspicious username");
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle("⚠️ Risk Analysis")
-            .setColor(riskScore > 50 ? 0xff0000 : 0x00ff00)
-            .addFields(
-                { name: "User", value: member.user.tag },
-                { name: "Risk Score", value: `${riskScore}/100` },
-                { name: "Flags", value: flags.join("\n") || "None" }
-            );
-
-        return message.reply({ embeds: [embed] });
-    }
-
-    // =============================
-    // AVATAR
-    // =============================
-
-    if (command === "avatar") {
-
-        const user =
-            message.mentions.users.first() ||
-            client.users.cache.get(args[0]) ||
-            message.author;
-
-        return message.reply(
-            user.displayAvatarURL({ dynamic: true, size: 512 })
-        );
     }
 
 });
