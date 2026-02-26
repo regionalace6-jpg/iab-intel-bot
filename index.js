@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, Collection } = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 
 const client = new Client({
     intents: [
@@ -11,112 +11,187 @@ const client = new Client({
 
 const PREFIX = "!";
 
-client.commands = new Collection();
-
 /*
 =====================================
- GOD MODE COMMAND SYSTEM
+ COMMAND CENTER UI BUILDER
 =====================================
 */
 
-const commands = {
+function Dossier(title, description, fields = []) {
 
-    ping: async (msg) => {
-        msg.reply(`🏓 Pong ${client.ws.ping}ms`);
-    },
+    return new EmbedBuilder()
+        .setTitle(`🟥 FBI COMMAND CENTER | ${title}`)
+        .setDescription(description || "Intelligence Report")
+        .addFields(fields)
+        .setColor("#ff0000")
+        .setTimestamp()
+        .setFooter({
+            text: "Federal Intelligence Bureau System"
+        });
+}
 
-    help: async (msg) => {
+/*
+=====================================
+ COMMAND DATABASE
+=====================================
+*/
 
-        msg.reply(`
-🛡 GOD MODE COMMAND LIST
+const commands = {};
 
-👤 User
-!userinfo
-!avatar
-!whois
-!mutuals
+/*
+=====================================
+ HELP COMMAND (COMMAND CENTER DASHBOARD)
+=====================================
+*/
 
-🎮 Roblox
-!robloxinfo
-!robloxid
-!robloxavatar
+commands.help = async (msg) => {
 
-🌍 OSINT
-!iplookup
-!geointel
-!domaininfo
+    const embed = Dossier(
+        "Command Control Dashboard",
+        "Active Intelligence Modules",
+        [
+            { name: "👤 User Intelligence", value: "!userinfo | !avatar" },
+            { name: "🎮 Roblox Intelligence", value: "!robloxinfo" },
+            { name: "🌍 OSINT Tools", value: "!iplookup" },
+            { name: "🤖 System", value: "!ping | !serverinfo" }
+        ]
+    );
 
-🚨 Security
-!serverinfo
-!raidstatus
-!securityscan
+    msg.reply({ embeds: [embed] });
+};
 
-🎯 Fun
-!iq
-!sigma
-!drip
-        `);
+/*
+=====================================
+ PING
+=====================================
+*/
 
-    },
+commands.ping = async (msg) => {
+    msg.reply(`🟥 Command Center Latency: ${client.ws.ping}ms`);
+};
 
-    userinfo: async (msg, args) => {
+/*
+=====================================
+ USER DOSSIER
+=====================================
+*/
 
-        let user = msg.mentions.users.first() || msg.author;
+commands.userinfo = async (msg, args) => {
 
-        if (args[0]) {
-            try {
-                user = await client.users.fetch(args[0]);
-            } catch {}
-        }
+    let user = msg.mentions.users.first() || msg.author;
 
-        const days = Math.floor(
-            (Date.now() - user.createdTimestamp) / 86400000
-        );
-
-        const embed = new EmbedBuilder()
-            .setTitle("👤 GOD MODE USER INTEL")
-            .setThumbnail(user.displayAvatarURL())
-            .addFields(
-                { name: "User", value: user.tag },
-                { name: "ID", value: user.id },
-                { name: "Account Age", value: `${days} days` }
-            );
-
-        msg.reply({ embeds: [embed] });
-    },
-
-    avatar: async (msg) => {
-
-        let user = msg.mentions.users.first() || msg.author;
-
-        msg.reply(user.displayAvatarURL({ size: 512 }));
-    },
-
-    iplookup: async (msg, args) => {
-
-        if (!args[0]) return msg.reply("Provide IP");
-
+    if (args[0]) {
         try {
-
-            const data = await fetch(
-                `https://ipapi.co/${args[0]}/json/`
-            ).then(r => r.json());
-
-            const embed = new EmbedBuilder()
-                .setTitle("🌍 IP Intelligence")
-                .addFields(
-                    { name: "City", value: data.city || "Unknown" },
-                    { name: "Country", value: data.country_name || "Unknown" },
-                    { name: "ISP", value: data.org || "Unknown" }
-                );
-
-            msg.reply({ embeds: [embed] });
-
-        } catch {
-            msg.reply("Lookup failed");
-        }
+            user = await client.users.fetch(args[0]);
+        } catch {}
     }
 
+    const ageDays = Math.floor(
+        (Date.now() - user.createdTimestamp) / 86400000
+    );
+
+    const embed = Dossier(
+        "Subject Dossier",
+        "",
+        [
+            { name: "Subject", value: user.tag, inline: true },
+            { name: "ID", value: user.id, inline: true },
+            { name: "Account Age", value: `${ageDays} days`, inline: true }
+        ]
+    ).setThumbnail(user.displayAvatarURL({ dynamic: true }));
+
+    msg.reply({ embeds: [embed] });
+};
+
+/*
+=====================================
+ ROBLOX DOSSIER
+=====================================
+*/
+
+commands.robloxinfo = async (msg, args) => {
+
+    if (!args[0])
+        return msg.reply("Provide Roblox username or ID");
+
+    try {
+
+        let target = args[0];
+
+        if (isNaN(target)) {
+
+            const res = await fetch(
+                "https://users.roblox.com/v1/usernames/users",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        usernames: [target]
+                    })
+                }
+            );
+
+            const data = await res.json();
+
+            if (!data.data.length)
+                return msg.reply("Subject not found");
+
+            target = data.data[0].id;
+        }
+
+        const info = await fetch(
+            `https://users.roblox.com/v1/users/${target}`
+        ).then(r => r.json());
+
+        const embed = Dossier(
+            "Roblox Subject Profile",
+            "",
+            [
+                { name: "Username", value: info.name || "Unknown" },
+                { name: "Display", value: info.displayName || "Unknown" },
+                { name: "Created", value: new Date(info.created).toDateString() }
+            ]
+        );
+
+        msg.reply({ embeds: [embed] });
+
+    } catch {
+        msg.reply("Roblox intelligence failure");
+    }
+};
+
+/*
+=====================================
+ GEO INTEL IP SCAN
+=====================================
+*/
+
+commands.iplookup = async (msg, args) => {
+
+    if (!args[0])
+        return msg.reply("Provide IP");
+
+    try {
+
+        const data = await fetch(
+            `https://ipapi.co/${args[0]}/json/`
+        ).then(r => r.json());
+
+        const embed = Dossier(
+            "Geo Intelligence Scan",
+            "",
+            [
+                { name: "City", value: data.city || "Unknown" },
+                { name: "Country", value: data.country_name || "Unknown" },
+                { name: "ISP", value: data.org || "Unknown" }
+            ]
+        );
+
+        msg.reply({ embeds: [embed] });
+
+    } catch {
+        msg.reply("Geo scan failed");
+    }
 };
 
 /*
@@ -133,13 +208,23 @@ client.on("messageCreate", async msg => {
     const cmd = args.shift().toLowerCase();
 
     if (commands[cmd]) {
-        commands[cmd](msg, args);
+        try {
+            await commands[cmd](msg, args);
+        } catch {
+            msg.reply("Command execution error.");
+        }
     }
 
 });
 
+/*
+=====================================
+ READY EVENT
+=====================================
+*/
+
 client.once("ready", () => {
-    console.log(`🟥 GOD MODE ACTIVE | ${client.user.tag}`);
+    console.log(`🟥 INTELLIGENCE COMMAND CENTER ONLINE | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
