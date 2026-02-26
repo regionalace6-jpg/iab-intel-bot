@@ -12,24 +12,18 @@ const client = new Client({
     ]
 });
 
-/*
-=====================================
- COMMAND PREFIX STYLE
-=====================================
-*/
-
 const PREFIX = "CommandsOptic.";
 
 /*
 =====================================
- UI BUILDER
+ INTELLIGENCE PROPERTY UI BUILDER
 =====================================
 */
 
-function OpticPanel(title, fields = [], desc = "") {
+function IntelPanel(title, fields = [], desc = "") {
 
     return new EmbedBuilder()
-        .setTitle(`🟥 COMMANDS OPTIC | ${title}`)
+        .setTitle(`🟥 INTELLIGENCE PROPERTY | ${title}`)
         .setDescription(desc)
         .addFields(fields)
         .setColor("#000000")
@@ -38,7 +32,7 @@ function OpticPanel(title, fields = [], desc = "") {
 
 /*
 =====================================
- COMMANDS
+ COMMAND DATABASE
 =====================================
 */
 
@@ -46,33 +40,32 @@ const commands = {};
 
 /*
 =====================================
- HELP
+ HELP MENU (LINE SEQUENCE STYLE)
 =====================================
 */
 
 commands.help = async msg => {
 
     const helpText = `
-🟥 COMMANDS OPTIC NETWORK
+🟥 INTELLIGENCE PROPERTY COMMAND LIST
 
-CommandsOptic.help
+USER INTEL
+CommandsOptic.userinfo
+CommandsOptic.avatar
+
+ROBLOX INTEL
+CommandsOptic.robloxinfo
+CommandsOptic.robloxavatar
+
+OSINT NETWORK
+CommandsOptic.iplookup
+CommandsOptic.dnslookup
+CommandsOptic.domaininfo
+
+UTILITY
 CommandsOptic.ping
-CommandsOptic.userinfo <user>
-CommandsOptic.robloxinfo <username/ID>
-CommandsOptic.robloxavatar <ID>
-
-🌍 OSINT
-CommandsOptic.iplookup <IP>
-CommandsOptic.dnslookup <domain>
-CommandsOptic.domaininfo <domain>
-CommandsOptic.geoip <IP>
-
-👤 DISCORD
-CommandsOptic.lookup <UserID>
-
-🤖 FUN
-CommandsOptic.quote
 CommandsOptic.iq
+CommandsOptic.quote
 `;
 
     msg.reply("```" + helpText + "```");
@@ -85,20 +78,20 @@ CommandsOptic.iq
 */
 
 commands.ping = async msg => {
-    msg.reply(`🏴 Latency: ${client.ws.ping}ms`);
+    msg.reply(`🏴 Intelligence Ping: ${client.ws.ping}ms`);
 };
 
 commands.iq = async msg => {
-    msg.reply(`🧠 IQ Score: ${Math.floor(Math.random() * 100) + 1}`);
+    msg.reply(`🧠 Intelligence Score: ${Math.floor(Math.random() * 100) + 1}`);
 };
 
 commands.quote = async msg => {
 
     const quotes = [
-        "Data is power",
-        "Observe before acting",
-        "Intelligence > Force",
-        "Knowledge is survival"
+        "Intelligence is power",
+        "Observe, then act",
+        "Data is modern warfare",
+        "Knowledge wins silently"
     ];
 
     msg.reply("🧠 " + quotes[Math.floor(Math.random() * quotes.length)]);
@@ -124,16 +117,23 @@ commands.userinfo = async (msg, args) => {
         (Date.now() - user.createdTimestamp) / 86400000
     );
 
-    const embed = OpticPanel(
+    const embed = IntelPanel(
         "User Intelligence",
         [
-            { name: "Username", value: user.tag, inline: true },
-            { name: "User ID", value: user.id, inline: true },
-            { name: "Account Age", value: age + " days", inline: true }
+            { name: "Username", value: user.tag },
+            { name: "User ID", value: user.id },
+            { name: "Account Age", value: age + " days" }
         ]
     );
 
     msg.reply({ embeds: [embed] });
+};
+
+commands.avatar = async msg => {
+
+    let user = msg.mentions.users.first() || msg.author;
+
+    msg.reply(user.displayAvatarURL({ dynamic: true, size: 512 }));
 };
 
 /*
@@ -166,7 +166,7 @@ commands.robloxinfo = async (msg, args) => {
             const data = await res.json();
 
             if (!data.data.length)
-                return msg.reply("User not found");
+                return msg.reply("Roblox user not found");
 
             target = data.data[0].id;
         }
@@ -175,7 +175,7 @@ commands.robloxinfo = async (msg, args) => {
             `https://users.roblox.com/v1/users/${target}`
         ).then(r => r.json());
 
-        const embed = OpticPanel(
+        const embed = IntelPanel(
             "Roblox Intelligence",
             [
                 { name: "Username", value: info.name || "Unknown" },
@@ -191,9 +191,18 @@ commands.robloxinfo = async (msg, args) => {
     }
 };
 
+commands.robloxavatar = async (msg, args) => {
+
+    if (!args[0]) return msg.reply("Provide Roblox ID");
+
+    msg.reply(
+        `https://www.roblox.com/headshot-thumbnail/image?userId=${args[0]}&width=420&height=420&format=png`
+    );
+};
+
 /*
 =====================================
- OSINT TOOLS
+ OSINT NETWORK
 =====================================
 */
 
@@ -201,11 +210,17 @@ commands.iplookup = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide IP");
 
-    const data = await fetch(
-        `http://ip-api.com/json/${args[0]}`
-    ).then(r => r.json());
+    try {
 
-    msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
+        const data = await fetch(
+            `http://ip-api.com/json/${args[0]}`
+        ).then(r => r.json());
+
+        msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
+
+    } catch {
+        msg.reply("IP lookup failed");
+    }
 };
 
 commands.dnslookup = async (msg, args) => {
@@ -243,18 +258,23 @@ client.on("messageCreate", async msg => {
     const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
     const cmd = args.shift().toLowerCase();
 
-    if (commands[cmd]) {
-        try {
+    try {
+
+        if (commands[cmd]) {
             await commands[cmd](msg, args);
-        } catch {
-            msg.reply("Command error");
+        } else {
+            msg.reply("Unknown Intelligence Command");
         }
+
+    } catch (err) {
+        console.error(err);
+        msg.reply("Command execution failed");
     }
 
 });
 
 client.once("ready", () => {
-    console.log(`🟥 COMMANDS OPTIC ONLINE | ${client.user.tag}`);
+    console.log(`🟥 INTELLIGENCE PROPERTY ACTIVE | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
