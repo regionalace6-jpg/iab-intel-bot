@@ -12,11 +12,11 @@ const client = new Client({
     ]
 });
 
-const PREFIX = "CommandsOptic.";
+const PREFIX = "*";
 
 /*
 =====================================
- INTELLIGENCE PROPERTY UI BUILDER
+ INTELLIGENCE PROPERTY UI
 =====================================
 */
 
@@ -40,32 +40,32 @@ const commands = {};
 
 /*
 =====================================
- HELP MENU (LINE SEQUENCE STYLE)
+ HELP COMMAND
 =====================================
 */
 
 commands.help = async msg => {
 
     const helpText = `
-🟥 INTELLIGENCE PROPERTY COMMAND LIST
+🟥 INTELLIGENCE PROPERTY COMMANDS
 
-USER INTEL
-CommandsOptic.userinfo
-CommandsOptic.avatar
+USER
+*userinfo <userID>
+*avatar
 
-ROBLOX INTEL
-CommandsOptic.robloxinfo
-CommandsOptic.robloxavatar
+ROBLOX
+*robloxinfo <username>
+*robloxavatar <ID>
 
-OSINT NETWORK
-CommandsOptic.iplookup
-CommandsOptic.dnslookup
-CommandsOptic.domaininfo
+OSINT
+*iplookup <IP>
+*dnslookup <domain>
+*domaininfo <domain>
 
 UTILITY
-CommandsOptic.ping
-CommandsOptic.iq
-CommandsOptic.quote
+*ping
+*iq
+*quote
 `;
 
     msg.reply("```" + helpText + "```");
@@ -89,9 +89,9 @@ commands.quote = async msg => {
 
     const quotes = [
         "Intelligence is power",
-        "Observe, then act",
-        "Data is modern warfare",
-        "Knowledge wins silently"
+        "Observe before acting",
+        "Data wins wars",
+        "Knowledge is survival"
     ];
 
     msg.reply("🧠 " + quotes[Math.floor(Math.random() * quotes.length)]);
@@ -210,17 +210,11 @@ commands.iplookup = async (msg, args) => {
 
     if (!args[0]) return msg.reply("Provide IP");
 
-    try {
+    const data = await fetch(
+        `http://ip-api.com/json/${args[0]}`
+    ).then(r => r.json());
 
-        const data = await fetch(
-            `http://ip-api.com/json/${args[0]}`
-        ).then(r => r.json());
-
-        msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
-
-    } catch {
-        msg.reply("IP lookup failed");
-    }
+    msg.reply("```json\n" + JSON.stringify(data, null, 2) + "\n```");
 };
 
 commands.dnslookup = async (msg, args) => {
