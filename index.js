@@ -12,20 +12,18 @@ const client = new Client({
 });
 
 client.once("ready", () => {
-    console.log(`INTELLIGENCE DASHBOARD Online as ${client.user.tag}`);
+    console.log(`🧠 INTELLIGENCE DASHBOARD Online as ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
     if (!message.content.startsWith(PREFIX) || message.author.bot) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+    const command = args.shift()?.toLowerCase();
 
     try {
 
-        // =========================
-        // HELP
-        // =========================
+        // ================= HELP =================
         if (command === "help") {
             const embed = new EmbedBuilder()
                 .setTitle("🧠 INTELLIGENCE DASHBOARD")
@@ -33,157 +31,153 @@ client.on("messageCreate", async (message) => {
                 .addFields(
                     { name: "Roblox", value: "`!rbxuser` `!rbxid` `!rbxavatar` `!rbxbadges` `!rbxfriends`" },
                     { name: "Discord", value: "`!duser` `!dinfo` `!davatar` `!dcreated` `!dbanner`" },
-                    { name: "IP / Domain", value: "`!iplookup` `!dnslookup` `!reverseip` `!portscan` `!geoip`" },
-                    { name: "Email", value: "`!emailinfo` `!reverseemail` `!emaildomain` `!mxlookup` `!emailbreach`" },
-                    { name: "OSINT", value: "`!metadata` `!blackvpn` `!hunter` `!shodan` `!urlscan`" }
+                    { name: "IP / Domain", value: "`!iplookup` `!dnslookup` `!geoip` `!mxlookup` `!emaildomain`" },
+                    { name: "Email / OSINT", value: "`!emailinfo` `!metadata` `!blackvpn` `!hunter` `!shodan`" }
                 )
                 .setColor("DarkButNotBlack");
 
-            message.reply({ embeds: [embed] });
+            return message.reply({ embeds: [embed] });
         }
 
-        // =========================
-        // ROBLOX COMMANDS
-        // =========================
+        // ================= ROBLOX =================
+
         if (command === "rbxuser") {
-            const username = args[0];
+            if (!args[0]) return message.reply("Provide username.");
+
             const res = await axios.post("https://users.roblox.com/v1/usernames/users", {
-                usernames: [username]
+                usernames: [args[0]]
             });
-            message.reply(`User ID: ${res.data.data[0].id}`);
+
+            if (!res.data.data.length) return message.reply("User not found.");
+
+            return message.reply(`User ID: ${res.data.data[0].id}`);
         }
 
         if (command === "rbxid") {
-            const id = args[0];
-            const res = await axios.get(`https://users.roblox.com/v1/users/${id}`);
-            message.reply(`Username: ${res.data.name}`);
+            if (!args[0]) return message.reply("Provide user ID.");
+
+            const res = await axios.get(`https://users.roblox.com/v1/users/${args[0]}`);
+            return message.reply(`Username: ${res.data.name}`);
         }
 
         if (command === "rbxavatar") {
-            const id = args[0];
-            const res = await axios.get(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${id}&size=420x420&format=Png`);
-            message.reply(res.data.data[0].imageUrl);
+            if (!args[0]) return message.reply("Provide user ID.");
+
+            const res = await axios.get(
+                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${args[0]}&size=420x420&format=Png`
+            );
+
+            if (!res.data.data.length) return message.reply("Avatar not found.");
+            return message.reply(res.data.data[0].imageUrl);
         }
 
         if (command === "rbxbadges") {
-            const id = args[0];
-            const res = await axios.get(`https://badges.roblox.com/v1/users/${id}/badges?limit=5`);
-            message.reply(`Badges Found: ${res.data.data.length}`);
+            if (!args[0]) return message.reply("Provide user ID.");
+
+            const res = await axios.get(
+                `https://badges.roblox.com/v1/users/${args[0]}/badges?limit=5`
+            );
+
+            return message.reply(`Badges Found: ${res.data.data.length}`);
         }
 
         if (command === "rbxfriends") {
-            const id = args[0];
-            const res = await axios.get(`https://friends.roblox.com/v1/users/${id}/friends/count`);
-            message.reply(`Friends: ${res.data.count}`);
+            if (!args[0]) return message.reply("Provide user ID.");
+
+            const res = await axios.get(
+                `https://friends.roblox.com/v1/users/${args[0]}/friends/count`
+            );
+
+            return message.reply(`Friends: ${res.data.count}`);
         }
 
-        // =========================
-        // DISCORD COMMANDS
-        // =========================
+        // ================= DISCORD =================
+
         if (command === "duser") {
-            const id = args[0];
-            const user = await client.users.fetch(id);
-            message.reply(`Username: ${user.tag}`);
+            if (!args[0]) return message.reply("Provide Discord ID.");
+            const user = await client.users.fetch(args[0]).catch(() => null);
+            if (!user) return message.reply("User not found.");
+
+            return message.reply(`Username: ${user.tag}`);
         }
 
         if (command === "dinfo") {
-            const id = args[0];
-            const user = await client.users.fetch(id);
-            message.reply(`Created: ${user.createdAt}`);
+            if (!args[0]) return message.reply("Provide Discord ID.");
+            const user = await client.users.fetch(args[0]).catch(() => null);
+            if (!user) return message.reply("User not found.");
+
+            return message.reply(`Created: ${user.createdAt}`);
         }
 
         if (command === "davatar") {
-            const id = args[0];
-            const user = await client.users.fetch(id);
-            message.reply(user.displayAvatarURL({ dynamic: true }));
+            if (!args[0]) return message.reply("Provide Discord ID.");
+            const user = await client.users.fetch(args[0]).catch(() => null);
+            if (!user) return message.reply("User not found.");
+
+            return message.reply(user.displayAvatarURL({ dynamic: true }));
         }
 
         if (command === "dcreated") {
-            const id = args[0];
-            const user = await client.users.fetch(id);
-            message.reply(`Account Created: ${user.createdAt.toDateString()}`);
+            if (!args[0]) return message.reply("Provide Discord ID.");
+            const user = await client.users.fetch(args[0]).catch(() => null);
+            if (!user) return message.reply("User not found.");
+
+            return message.reply(`Account Created: ${user.createdAt.toDateString()}`);
         }
 
         if (command === "dbanner") {
-            message.reply("Banner requires privileged intent.");
+            return message.reply("Banner requires privileged intent enabled.");
         }
 
-        // =========================
-        // IP / DOMAIN
-        // =========================
+        // ================= IP / DOMAIN =================
+
         if (command === "iplookup" || command === "geoip") {
-            const ip = args[0];
-            const res = await axios.get(`http://ip-api.com/json/${ip}`);
-            message.reply(`${res.data.country}, ${res.data.city}`);
+            if (!args[0]) return message.reply("Provide IP address.");
+
+            const res = await axios.get(`http://ip-api.com/json/${args[0]}`);
+            if (res.data.status !== "success") return message.reply("Invalid IP.");
+
+            return message.reply(
+                `Country: ${res.data.country}\nCity: ${res.data.city}\nISP: ${res.data.isp}`
+            );
         }
 
         if (command === "dnslookup") {
-            const domain = args[0];
-            const records = await dns.lookup(domain);
-            message.reply(`IP: ${records.address}`);
-        }
-
-        if (command === "reverseip") {
-            message.reply("Reverse IP requires paid API.");
-        }
-
-        if (command === "portscan") {
-            message.reply("Port scanning disabled on Railway.");
-        }
-
-        // =========================
-        // EMAIL
-        // =========================
-        if (command === "emailinfo") {
-            const email = args[0];
-            const domain = email.split("@")[1];
-            message.reply(`Domain: ${domain}`);
-        }
-
-        if (command === "reverseemail") {
-            message.reply("Reverse email requires paid OSINT API.");
-        }
-
-        if (command === "emaildomain") {
-            const email = args[0];
-            message.reply(email.split("@")[1]);
+            if (!args[0]) return message.reply("Provide domain.");
+            const records = await dns.lookup(args[0]);
+            return message.reply(`IP: ${records.address}`);
         }
 
         if (command === "mxlookup") {
-            const domain = args[0];
-            const records = await dns.resolveMx(domain);
-            message.reply(JSON.stringify(records));
+            if (!args[0]) return message.reply("Provide domain.");
+            const records = await dns.resolveMx(args[0]);
+            return message.reply(JSON.stringify(records, null, 2));
         }
 
-        if (command === "emailbreach") {
-            message.reply("Breach check requires HaveIBeenPwned API key.");
+        if (command === "emaildomain") {
+            if (!args[0]) return message.reply("Provide email.");
+            if (!args[0].includes("@")) return message.reply("Invalid email.");
+
+            return message.reply(args[0].split("@")[1]);
         }
 
-        // =========================
-        // OSINT
-        // =========================
-        if (command === "metadata") {
-            message.reply("Upload file to extract metadata (feature placeholder).");
+        if (command === "emailinfo") {
+            if (!args[0]) return message.reply("Provide email.");
+            if (!args[0].includes("@")) return message.reply("Invalid email.");
+
+            const domain = args[0].split("@")[1];
+            return message.reply(`Domain: ${domain}`);
         }
 
-        if (command === "blackvpn") {
-            message.reply("VPN detection requires external API.");
-        }
+        // ================= PLACEHOLDERS =================
 
-        if (command === "hunter") {
-            message.reply("Hunter.io requires API key.");
-        }
-
-        if (command === "shodan") {
-            message.reply("Shodan requires API key.");
-        }
-
-        if (command === "urlscan") {
-            message.reply("URLScan requires API key.");
+        if (["reverseemail","emailbreach","metadata","blackvpn","hunter","shodan","urlscan"].includes(command)) {
+            return message.reply("This feature requires external API key.");
         }
 
     } catch (err) {
-        message.reply("Command failed. Check input.");
+        console.error(err); // now you see real Railway error
+        message.reply("Command failed. Check input or logs.");
     }
 });
 
