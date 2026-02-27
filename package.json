@@ -1,17 +1,17 @@
 {
-  "name": "advanced-intel-bot",
-  "version": "3.0.0",
-  "description": "Discord Intelligence Property Bot with Roblox and OSINT tools",
+  "name": "advanced-userinfo-bot",
+  "version": "2.1.0",
+  "description": "Intelligence Discord bot with Roblox and OSINT",
   "main": "index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.11.0",
-    "node-fetch": "^3.3.2"
+    "discord.js": "^14.15.0",
+    "node-fetch": "^3.4.0"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18.0.0"
   }
 }
