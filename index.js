@@ -11,6 +11,15 @@ const client = new Client({
     ]
 });
 
+// Prevent silent crashes
+process.on("unhandledRejection", (err) => {
+    console.error("Unhandled Rejection:", err);
+});
+
+process.on("uncaughtException", (err) => {
+    console.error("Uncaught Exception:", err);
+});
+
 client.once("ready", () => {
     console.log(`🧠 INTELLIGENCE DASHBOARD Online as ${client.user.tag}`);
 });
@@ -27,14 +36,13 @@ client.on("messageCreate", async (message) => {
         if (command === "help") {
             const embed = new EmbedBuilder()
                 .setTitle("🧠 INTELLIGENCE DASHBOARD")
-                .setDescription("Full Command List")
+                .setColor("DarkButNotBlack")
                 .addFields(
-                    { name: "Roblox", value: "`!rbxuser` `!rbxid` `!rbxavatar` `!rbxbadges` `!rbxfriends`" },
-                    { name: "Discord", value: "`!duser` `!dinfo` `!davatar` `!dcreated` `!dbanner`" },
-                    { name: "IP / Domain", value: "`!iplookup` `!dnslookup` `!geoip` `!mxlookup` `!emaildomain`" },
-                    { name: "Email / OSINT", value: "`!emailinfo` `!metadata` `!blackvpn` `!hunter` `!shodan`" }
-                )
-                .setColor("DarkButNotBlack");
+                    { name: "Roblox", value: "`!rbxuser <name>` `!rbxid <id>` `!rbxavatar <id>` `!rbxbadges <id>` `!rbxfriends <id>`" },
+                    { name: "Discord", value: "`!duser <id>` `!dinfo <id>` `!davatar <id>` `!dcreated <id>` `!dbanner`" },
+                    { name: "IP / Domain", value: "`!iplookup <ip>` `!dnslookup <domain>` `!mxlookup <domain>` `!geoip <ip>`" },
+                    { name: "Email", value: "`!emailinfo <email>` `!emaildomain <email>`" }
+                );
 
             return message.reply({ embeds: [embed] });
         }
@@ -44,11 +52,13 @@ client.on("messageCreate", async (message) => {
         if (command === "rbxuser") {
             if (!args[0]) return message.reply("Provide username.");
 
-            const res = await axios.post("https://users.roblox.com/v1/usernames/users", {
-                usernames: [args[0]]
-            });
+            const res = await axios.post(
+                "https://users.roblox.com/v1/usernames/users",
+                { usernames: [args[0]] }
+            );
 
-            if (!res.data.data.length) return message.reply("User not found.");
+            if (!res.data.data.length)
+                return message.reply("User not found.");
 
             return message.reply(`User ID: ${res.data.data[0].id}`);
         }
@@ -56,7 +66,10 @@ client.on("messageCreate", async (message) => {
         if (command === "rbxid") {
             if (!args[0]) return message.reply("Provide user ID.");
 
-            const res = await axios.get(`https://users.roblox.com/v1/users/${args[0]}`);
+            const res = await axios.get(
+                `https://users.roblox.com/v1/users/${args[0]}`
+            );
+
             return message.reply(`Username: ${res.data.name}`);
         }
 
@@ -67,7 +80,9 @@ client.on("messageCreate", async (message) => {
                 `https://thumbnails.roblox.com/v1/users/avatar?userIds=${args[0]}&size=420x420&format=Png`
             );
 
-            if (!res.data.data.length) return message.reply("Avatar not found.");
+            if (!res.data.data.length)
+                return message.reply("Avatar not found.");
+
             return message.reply(res.data.data[0].imageUrl);
         }
 
@@ -95,6 +110,7 @@ client.on("messageCreate", async (message) => {
 
         if (command === "duser") {
             if (!args[0]) return message.reply("Provide Discord ID.");
+
             const user = await client.users.fetch(args[0]).catch(() => null);
             if (!user) return message.reply("User not found.");
 
@@ -103,6 +119,7 @@ client.on("messageCreate", async (message) => {
 
         if (command === "dinfo") {
             if (!args[0]) return message.reply("Provide Discord ID.");
+
             const user = await client.users.fetch(args[0]).catch(() => null);
             if (!user) return message.reply("User not found.");
 
@@ -111,6 +128,7 @@ client.on("messageCreate", async (message) => {
 
         if (command === "davatar") {
             if (!args[0]) return message.reply("Provide Discord ID.");
+
             const user = await client.users.fetch(args[0]).catch(() => null);
             if (!user) return message.reply("User not found.");
 
@@ -119,14 +137,17 @@ client.on("messageCreate", async (message) => {
 
         if (command === "dcreated") {
             if (!args[0]) return message.reply("Provide Discord ID.");
+
             const user = await client.users.fetch(args[0]).catch(() => null);
             if (!user) return message.reply("User not found.");
 
-            return message.reply(`Account Created: ${user.createdAt.toDateString()}`);
+            return message.reply(
+                `Account Created: ${user.createdAt.toDateString()}`
+            );
         }
 
         if (command === "dbanner") {
-            return message.reply("Banner requires privileged intent enabled.");
+            return message.reply("Enable privileged intents to access banners.");
         }
 
         // ================= IP / DOMAIN =================
@@ -134,8 +155,12 @@ client.on("messageCreate", async (message) => {
         if (command === "iplookup" || command === "geoip") {
             if (!args[0]) return message.reply("Provide IP address.");
 
-            const res = await axios.get(`http://ip-api.com/json/${args[0]}`);
-            if (res.data.status !== "success") return message.reply("Invalid IP.");
+            const res = await axios.get(
+                `http://ip-api.com/json/${args[0]}`
+            );
+
+            if (res.data.status !== "success")
+                return message.reply("Invalid IP address.");
 
             return message.reply(
                 `Country: ${res.data.country}\nCity: ${res.data.city}\nISP: ${res.data.isp}`
@@ -144,40 +169,46 @@ client.on("messageCreate", async (message) => {
 
         if (command === "dnslookup") {
             if (!args[0]) return message.reply("Provide domain.");
-            const records = await dns.lookup(args[0]);
-            return message.reply(`IP: ${records.address}`);
+
+            const result = await dns.lookup(args[0]);
+            return message.reply(`IP Address: ${result.address}`);
         }
 
         if (command === "mxlookup") {
             if (!args[0]) return message.reply("Provide domain.");
+
             const records = await dns.resolveMx(args[0]);
-            return message.reply(JSON.stringify(records, null, 2));
+
+            if (!records.length)
+                return message.reply("No MX records found.");
+
+            const formatted = records
+                .map(r => `Priority: ${r.priority} | ${r.exchange}`)
+                .join("\n");
+
+            return message.reply(`MX Records:\n${formatted}`);
         }
 
-        if (command === "emaildomain") {
-            if (!args[0]) return message.reply("Provide email.");
-            if (!args[0].includes("@")) return message.reply("Invalid email.");
-
-            return message.reply(args[0].split("@")[1]);
-        }
+        // ================= EMAIL =================
 
         if (command === "emailinfo") {
-            if (!args[0]) return message.reply("Provide email.");
-            if (!args[0].includes("@")) return message.reply("Invalid email.");
+            if (!args[0] || !args[0].includes("@"))
+                return message.reply("Provide valid email.");
 
             const domain = args[0].split("@")[1];
             return message.reply(`Domain: ${domain}`);
         }
 
-        // ================= PLACEHOLDERS =================
+        if (command === "emaildomain") {
+            if (!args[0] || !args[0].includes("@"))
+                return message.reply("Provide valid email.");
 
-        if (["reverseemail","emailbreach","metadata","blackvpn","hunter","shodan","urlscan"].includes(command)) {
-            return message.reply("This feature requires external API key.");
+            return message.reply(args[0].split("@")[1]);
         }
 
     } catch (err) {
-        console.error(err); // now you see real Railway error
-        message.reply("Command failed. Check input or logs.");
+        console.error("Command Error:", err);
+        return message.reply("Command failed. Check input.");
     }
 });
 
