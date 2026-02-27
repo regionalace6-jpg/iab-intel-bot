@@ -3,7 +3,6 @@
   "version": "3.0.0",
   "description": "All-in-one Discord intelligence, Roblox, OSINT & utility bot",
   "main": "index.js",
-  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
