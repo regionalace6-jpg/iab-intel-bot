@@ -1,7 +1,7 @@
 {
   "name": "intelligence-property-final",
   "version": "4.0.0",
-  "description": "Final Exam Version Intel Bot",
+  "description": "Advanced Userinfo + Roblox + OSINT Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
