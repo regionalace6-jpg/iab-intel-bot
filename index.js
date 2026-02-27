@@ -1,199 +1,181 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-const axios = require('axios');
-const dns = require('dns').promises;
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const axios = require("axios");
+const dns = require("dns").promises;
+const fs = require("fs");
+const crypto = require("crypto");
+
+// 🔐 SECURE TOKEN (DO NOT HARD CODE TOKEN)
+const TOKEN = process.env.TOKEN;
+
+// 🔑 PUT YOUR DISCORD USER ID HERE
+const OWNER_ID = "924501682619052042";
 
 const PREFIX = "!";
-const cooldown = new Set();
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-process.on("unhandledRejection", console.error);
-process.on("uncaughtException", console.error);
+let accessList = [];
+
+if (fs.existsSync("access.json")) {
+  accessList = JSON.parse(fs.readFileSync("access.json"));
+}
+
+function saveAccess() {
+  fs.writeFileSync("access.json", JSON.stringify(accessList, null, 2));
+}
+
+function hasAccess(userId) {
+  return userId === OWNER_ID || accessList.includes(userId);
+}
+
+function formatDate(date) {
+  const d = new Date(date);
+  return {
+    day: d.toDateString(),
+    time: d.toLocaleTimeString()
+  };
+}
 
 client.once("ready", () => {
-    console.log(`🖤 BLACK OPS INTELLIGENCE Online as ${client.user.tag}`);
+  console.log(`Logged in as ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (message) => {
-    if (!message.content.startsWith(PREFIX) || message.author.bot) return;
+  if (!message.content.startsWith(PREFIX) || message.author.bot) return;
 
-    // Cooldown system (3 sec)
-    if (cooldown.has(message.author.id))
-        return message.reply("⏳ Slow down.");
+  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
 
-    cooldown.add(message.author.id);
-    setTimeout(() => cooldown.delete(message.author.id), 3000);
+  // 🔐 ACCESS SYSTEM
+  if (command === "access") {
+    if (message.author.id !== OWNER_ID)
+      return message.reply("Owner only command.");
 
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift()?.toLowerCase();
+    const action = args[0];
+    const id = args[1];
 
-    try {
+    if (!id) return message.reply("Provide a user ID.");
 
-        // ================= HELP =================
-        if (command === "help") {
-            const embed = new EmbedBuilder()
-                .setTitle("🖤 BLACK OPS INTELLIGENCE")
-                .setColor("#0f0f0f")
-                .setDescription("Advanced Intelligence & OSINT System")
-                .addFields(
-                    { name: "Roblox", value: "`!rbxuser <username>`" },
-                    { name: "Discord", value: "`!duser <id>`" },
-                    { name: "IP", value: "`!iplookup <ip>`" },
-                    { name: "Domain", value: "`!domain <domain>`" },
-                    { name: "Email", value: "`!email <email>`" }
-                );
-
-            return message.reply({ embeds: [embed] });
-        }
-
-        // ================= ROBLOX BLACK OPS =================
-        if (command === "rbxuser") {
-            if (!args[0]) return message.reply("Provide username.");
-
-            const userRes = await axios.post(
-                "https://users.roblox.com/v1/usernames/users",
-                { usernames: [args[0]] }
-            );
-
-            if (!userRes.data.data.length)
-                return message.reply("User not found.");
-
-            const userId = userRes.data.data[0].id;
-
-            const [profile, friends, followers, badges, avatar] = await Promise.all([
-                axios.get(`https://users.roblox.com/v1/users/${userId}`),
-                axios.get(`https://friends.roblox.com/v1/users/${userId}/friends/count`),
-                axios.get(`https://friends.roblox.com/v1/users/${userId}/followers/count`),
-                axios.get(`https://badges.roblox.com/v1/users/${userId}/badges?limit=100`),
-                axios.get(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png`)
-            ]);
-
-            const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX BLACK OPS INTEL")
-                .setColor("#111111")
-                .setThumbnail(avatar.data.data[0].imageUrl)
-                .addFields(
-                    { name: "Username", value: profile.data.name, inline: true },
-                    { name: "Display", value: profile.data.displayName, inline: true },
-                    { name: "User ID", value: userId.toString(), inline: true },
-                    { name: "Friends", value: friends.data.count.toString(), inline: true },
-                    { name: "Followers", value: followers.data.count.toString(), inline: true },
-                    { name: "Badges", value: badges.data.data.length.toString(), inline: true },
-                    { name: "Created", value: new Date(profile.data.created).toLocaleString(), inline: false }
-                )
-                .setFooter({ text: "BLACK OPS INTELLIGENCE SYSTEM" });
-
-            return message.reply({ embeds: [embed] });
-        }
-
-        // ================= DISCORD BLACK OPS =================
-        if (command === "duser") {
-            if (!args[0]) return message.reply("Provide Discord ID.");
-
-            const user = await client.users.fetch(args[0], { force: true }).catch(() => null);
-            if (!user) return message.reply("User not found.");
-
-            const fullUser = await user.fetch();
-
-            const embed = new EmbedBuilder()
-                .setTitle("💬 DISCORD BLACK OPS INTEL")
-                .setColor("#111111")
-                .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 512 }))
-                .addFields(
-                    { name: "Tag", value: user.tag, inline: true },
-                    { name: "User ID", value: user.id, inline: true },
-                    { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
-                    { name: "Created", value: user.createdAt.toLocaleString(), inline: false }
-                )
-                .setFooter({ text: "BLACK OPS INTELLIGENCE SYSTEM" });
-
-            if (fullUser.banner)
-                embed.setImage(user.bannerURL({ size: 1024 }));
-
-            return message.reply({ embeds: [embed] });
-        }
-
-        // ================= IP BLACK OPS =================
-        if (command === "iplookup") {
-            if (!args[0]) return message.reply("Provide IP.");
-
-            const res = await axios.get(`http://ip-api.com/json/${args[0]}?fields=66846719`);
-
-            if (res.data.status !== "success")
-                return message.reply("Invalid IP.");
-
-            const embed = new EmbedBuilder()
-                .setTitle("🌍 IP BLACK OPS INTEL")
-                .setColor("#111111")
-                .addFields(
-                    { name: "IP", value: res.data.query, inline: true },
-                    { name: "Country", value: res.data.country, inline: true },
-                    { name: "City", value: res.data.city, inline: true },
-                    { name: "ISP", value: res.data.isp, inline: true },
-                    { name: "Hosting", value: res.data.hosting ? "Yes" : "No", inline: true },
-                    { name: "Proxy/VPN", value: res.data.proxy ? "Yes" : "No", inline: true },
-                    { name: "Timezone", value: res.data.timezone, inline: true }
-                )
-                .setFooter({ text: "BLACK OPS INTELLIGENCE SYSTEM" });
-
-            return message.reply({ embeds: [embed] });
-        }
-
-        // ================= DOMAIN BLACK OPS =================
-        if (command === "domain") {
-            if (!args[0]) return message.reply("Provide domain.");
-
-            const lookup = await dns.lookup(args[0]);
-            const mx = await dns.resolveMx(args[0]).catch(() => []);
-
-            const embed = new EmbedBuilder()
-                .setTitle("🌐 DOMAIN BLACK OPS INTEL")
-                .setColor("#111111")
-                .addFields(
-                    { name: "Domain", value: args[0], inline: true },
-                    { name: "IP", value: lookup.address, inline: true },
-                    { name: "MX Records", value: mx.length ? mx.map(m => m.exchange).join("\n") : "None", inline: false }
-                )
-                .setFooter({ text: "BLACK OPS INTELLIGENCE SYSTEM" });
-
-            return message.reply({ embeds: [embed] });
-        }
-
-        // ================= EMAIL BLACK OPS =================
-        if (command === "email") {
-            if (!args[0] || !args[0].includes("@"))
-                return message.reply("Provide valid email.");
-
-            const email = args[0];
-            const domain = email.split("@")[1];
-
-            const lookup = await dns.lookup(domain).catch(() => null);
-            const mx = await dns.resolveMx(domain).catch(() => []);
-
-            const embed = new EmbedBuilder()
-                .setTitle("📧 EMAIL BLACK OPS INTEL")
-                .setColor("#111111")
-                .addFields(
-                    { name: "Email", value: email, inline: false },
-                    { name: "Domain", value: domain, inline: true },
-                    { name: "Domain IP", value: lookup ? lookup.address : "Unknown", inline: true },
-                    { name: "MX Records", value: mx.length ? mx.map(m => m.exchange).join("\n") : "None", inline: false }
-                )
-                .setFooter({ text: "BLACK OPS INTELLIGENCE SYSTEM" });
-
-            return message.reply({ embeds: [embed] });
-        }
-
-    } catch (err) {
-        console.error(err);
-        message.reply("⚠ Intelligence retrieval failed.");
+    if (action === "add") {
+      if (!accessList.includes(id)) {
+        accessList.push(id);
+        saveAccess();
+        return message.reply(`Access granted to ${id}`);
+      }
     }
+
+    if (action === "remove") {
+      accessList = accessList.filter(u => u !== id);
+      saveAccess();
+      return message.reply(`Access removed from ${id}`);
+    }
+
+    if (action === "list") {
+      return message.reply(
+        accessList.length
+          ? `Access List:\n${accessList.join("\n")}`
+          : "No users have access."
+      );
+    }
+  }
+
+  if (!hasAccess(message.author.id)) {
+    return message.reply("You are not authorized.");
+  }
+
+  // 🟥 DISCORD USER INFO
+  if (command === "discorduser") {
+    const user =
+      message.mentions.users.first() ||
+      (await client.users.fetch(args[0]).catch(() => null));
+
+    if (!user) return message.reply("User not found.");
+
+    const created = formatDate(user.createdAt);
+
+    const embed = new EmbedBuilder()
+      .setColor("Red")
+      .setTitle("Discord Intelligence Report")
+      .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+      .addFields(
+        { name: "Username", value: user.tag, inline: true },
+        { name: "User ID", value: user.id, inline: true },
+        { name: "Bot Account", value: user.bot ? "Yes" : "No", inline: true },
+        { name: "Created Date", value: created.day, inline: true },
+        { name: "Created Time", value: created.time, inline: true }
+      )
+      .setFooter({ text: "INTELLIGENCE PROPERTY • Public Data Only" });
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  // 🟨 EMAIL DNS CHECK
+  if (command === "email") {
+    const email = args[0];
+    if (!email) return message.reply("Provide email.");
+
+    const domain = email.split("@")[1];
+    if (!domain) return message.reply("Invalid email.");
+
+    const mx = await dns.resolveMx(domain).catch(() => null);
+
+    const embed = new EmbedBuilder()
+      .setColor("Yellow")
+      .setTitle("Email Intelligence")
+      .addFields(
+        { name: "Email", value: email },
+        { name: "Domain", value: domain },
+        {
+          name: "MX Records",
+          value: mx ? mx.map(m => m.exchange).join("\n") : "None Found"
+        }
+      );
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  // 🟩 IP GEO LOOKUP
+  if (command === "ip") {
+    const ip = args[0];
+    if (!ip) return message.reply("Provide IP.");
+
+    const res = await axios.get(`http://ip-api.com/json/${ip}`);
+    const data = res.data;
+
+    const embed = new EmbedBuilder()
+      .setColor("Green")
+      .setTitle("IP Intelligence")
+      .addFields(
+        { name: "Country", value: data.country || "N/A", inline: true },
+        { name: "City", value: data.city || "N/A", inline: true },
+        { name: "ISP", value: data.isp || "N/A", inline: true },
+        { name: "Timezone", value: data.timezone || "N/A", inline: true }
+      );
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  // 🟪 HASH TOOL
+  if (command === "hash") {
+    const text = args.join(" ");
+    if (!text) return message.reply("Provide text.");
+
+    const embed = new EmbedBuilder()
+      .setColor("Purple")
+      .setTitle("Hash Generator")
+      .addFields(
+        { name: "MD5", value: crypto.createHash("md5").update(text).digest("hex") },
+        { name: "SHA256", value: crypto.createHash("sha256").update(text).digest("hex") }
+      );
+
+    return message.reply({ embeds: [embed] });
+  }
 });
 
-client.login(process.env.TOKEN);
+client.login(TOKEN);
