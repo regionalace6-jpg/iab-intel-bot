@@ -1,175 +1,164 @@
-// index.js
-import { Client, GatewayIntentBits, EmbedBuilder } from "discord.js";
+// Import necessary packages and modules
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 
+// Use node-fetch properly
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+
+const PREFIX = "!";
+
+// Create Discord client with proper intents enabled
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    GatewayIntentBits.MessageContent,  // IMPORTANT: Required to read message content
+  ],
 });
 
-const PREFIX = "!";
-
-// -----------------------------
-// Panel Builder
-// -----------------------------
-function Panel(title, fields = []) {
-  return new EmbedBuilder()
-    .setTitle(`🟥 INTELLIGENCE PROPERTY | ${title}`)
-    .addFields(fields)
-    .setColor("#000000")
-    .setTimestamp();
-}
-
-// -----------------------------
-// Commands
-// -----------------------------
+// Command collection
 const commands = {};
 
-// ---------- HELP ----------
-commands.help = async msg => {
-  const helpText = `
-[Discord Commands]
-1. !userinfo - Full Discord info
-2. !userinfoglobal <id> - Global Discord user info
-3. !avatar - Show avatar
-4. !avatarglobal <id> - Global avatar
-5. !serverinfo - Server info
-6. !membercount - Members in server
-7. !roles - Server roles list
-8. !permissions - Show user permissions
-9. !joineddate - Show join date
-10. !accountage - Account age
-11. !botcheck - Is bot?
-12. !nickname - Server nickname
-13. !status - Online status
-14. !activity - Current activity
-15. !toprole - Top role
-16. !hoistedrole - Hoisted role
-17. !discriminator - Show discriminator
-18. !tag - Full tag
-19. !joinedserver - Join date exact
-20. !rolescount - Number of roles
-21. !muted - Check mute
-22. !boosted - Check if boosted
-23. !boosteddate - Boost date
-24. !lastmessage - Last message in server
-25. !voicechannel - Current voice channel
+/* ======= COMMANDS ======= */
 
-[Roblox Commands]
-26. !robloxinfo <username/id> - Roblox info
-27. !robloxavatar <id> - Avatar image
-28. !robloxfriends <username/id> - Friends count
-29. !robloxfollowers <username/id> - Followers count
-30. !robloxfollowing <username/id> - Following count
-31. !robloxgroups <username/id> - Groups count
-32. !robloxcreated <username/id> - Account creation
-33. !robloxbio <username/id> - User bio
-34. !robloxfavgames <username/id> - Favorite games
-35. !robloxheadshot <id> - Headshot image
-36. !robloxsearch <username> - Global search
-37. !robloxusername <id> - ID → username
-38-50. Placeholder Roblox commands (expandable)
-
-[OSINT Commands]
-51. !iplookup <ip> - IP info
-52. !dnslookup <domain> - DNS info
-53. !whois <domain> - WHOIS info
-54. !geoip <ip> - Geolocation
-55. !asn <ip> - ASN info
-56. !reverseip <ip> - Reverse IP
-57. !subdomains <domain> - Public subdomains
-58. !emails <domain> - Public emails
-59. !urlscan <url> - URL scan summary
-60. !threatcheck <ip/domain> - Threat check
-61-75. Additional OSINT placeholders
-
-[Utility Commands]
-76. !ping - Bot latency
-77. !quote - Random quote
-78. !iq - Random IQ
-79. !roll <dice> - Roll dice
-80. !flip - Coin flip
-81. !randnum <min> <max> - Random number
-82. !echo <text> - Repeat text
-83. !say <text> - Bot says text
-84. !time - Current time
-85. !date - Current date
-86. !math <expression> - Simple math
-87. !joke - Random joke
-88. !8ball <question> - Magic 8-ball
-89. !remind <time> <text> - Reminder
-90. !intel <id/username> - Full panel Discord+Roblox
-91-100. Utility placeholders
-`;
-  msg.reply({ content: helpText });
+// Ping command - test bot responsiveness
+commands.ping = async (msg) => {
+  msg.reply(`🏴 Pong! Latency: ${client.ws.ping}ms`);
 };
 
-// ---------- PING ----------
-commands.ping = async msg => msg.reply(`🏴 Ping: ${client.ws.ping}ms`);
-
-// ---------- QUOTE ----------
-commands.quote = async msg => {
-  const quotes = [
-    "Intelligence is power",
-    "Data is modern warfare",
-    "Observe before acting",
-    "Knowledge wins silently"
-  ];
-  msg.reply(`🧠 ${quotes[Math.floor(Math.random() * quotes.length)]}`);
+// Test command - check if commands are working
+commands.test = async (msg) => {
+  msg.reply("✅ Test command working!");
 };
 
-// ---------- Global Discord Info ----------
-commands.userinfoglobal = async (msg, args) => {
-  if (!args[0]) return msg.reply("Provide a Discord ID");
-
+// Userinfo - global lookup by ID, mention, or defaults to author
+commands.userinfo = async (msg, args) => {
   let user;
   try {
-    user = await client.users.fetch(args[0]);
+    if (msg.mentions.users.size > 0) user = msg.mentions.users.first();
+    else if (args[0]) user = await client.users.fetch(args[0]);
+    else user = msg.author;
   } catch {
-    return msg.reply("User not found");
+    return msg.reply("❌ Could not find user.");
+  }
+
+  // If possible, get guild member info for join date etc.
+  const member = msg.guild ? msg.guild.members.cache.get(user.id) : null;
+
+  const accountCreated = `<t:${Math.floor(user.createdTimestamp / 1000)}:F>`;
+  const accountAgeDays = Math.floor((Date.now() - user.createdTimestamp) / 86400000);
+
+  let serverJoined = "Not in this server";
+  let serverJoinAge = "N/A";
+  if (member && member.joinedTimestamp) {
+    serverJoined = `<t:${Math.floor(member.joinedTimestamp / 1000)}:F>`;
+    serverJoinAge = Math.floor((Date.now() - member.joinedTimestamp) / 86400000) + " days";
   }
 
   const embed = new EmbedBuilder()
-    .setTitle("🟥 Discord Intelligence Profile")
+    .setTitle(`🟥 Discord Userinfo - ${user.tag}`)
     .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 512 }))
-    .addFields([
+    .addFields(
       { name: "Username", value: user.tag, inline: true },
       { name: "User ID", value: user.id, inline: true },
-      { name: "Bot?", value: user.bot ? "Yes" : "No", inline: true },
-      { name: "Account Created", value: `<t:${Math.floor(user.createdTimestamp/1000)}:F>` },
-      { name: "Account Age", value: `${Math.floor((Date.now()-user.createdTimestamp)/86400000)} days`, inline: true }
-    ])
+      { name: "Account Created", value: accountCreated, inline: true },
+      { name: "Account Age", value: `${accountAgeDays} days`, inline: true },
+      { name: "Server Joined", value: serverJoined, inline: true },
+      { name: "Server Join Age", value: serverJoinAge, inline: true },
+    )
     .setColor("#000000")
     .setTimestamp();
 
   msg.reply({ embeds: [embed] });
 };
 
-// ---------- Roblox Global Placeholder ----------
-commands.robloxsearch = async (msg, args) => {
-  if (!args[0]) return msg.reply("Provide Roblox username to search globally");
-  msg.reply(`🔎 Roblox search for ${args[0]} is currently a placeholder (real API integration coming)`);
+// Roblox info command - username or ID to profile
+commands.robloxinfo = async (msg, args) => {
+  if (!args[0]) return msg.reply("❌ Provide a Roblox username or ID.");
+
+  try {
+    let target = args[0];
+
+    if (isNaN(target)) {
+      // Lookup user ID by username
+      const res = await fetch("https://users.roblox.com/v1/usernames/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usernames: [target], excludeBannedUsers: true }),
+      });
+      const data = await res.json();
+      if (!data.data || data.data.length === 0) return msg.reply("❌ Roblox user not found.");
+      target = data.data[0].id;
+    }
+
+    // Fetch user info
+    const infoRes = await fetch(`https://users.roblox.com/v1/users/${target}`);
+    const info = await infoRes.json();
+
+    if (!info || info.errors) return msg.reply("❌ Roblox user info fetch failed.");
+
+    const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${target}&width=420&height=420&format=png`;
+
+    const embed = new EmbedBuilder()
+      .setTitle(`🟥 Roblox Profile - ${info.name || "Unknown"}`)
+      .setThumbnail(avatarUrl)
+      .addFields(
+        { name: "Username", value: info.name || "Unknown", inline: true },
+        { name: "Display Name", value: info.displayName || "Unknown", inline: true },
+        { name: "Created", value: new Date(info.created).toDateString(), inline: true }
+      )
+      .setColor("#000000")
+      .setTimestamp();
+
+    msg.reply({ embeds: [embed] });
+
+  } catch (err) {
+    console.error(err);
+    msg.reply("❌ Failed to fetch Roblox info.");
+  }
 };
 
-// ---------- Message Handler ----------
-client.on("messageCreate", async msg => {
-  if (msg.author.bot || !msg.content.startsWith(PREFIX)) return;
+// Help command
+commands.help = async (msg) => {
+  const helpList = [
+    "**Discord Commands:**",
+    "1. !ping - Check bot latency",
+    "2. !test - Test if bot commands work",
+    "3. !userinfo <id or mention> - Get Discord user info",
+    "",
+    "**Roblox Commands:**",
+    "4. !robloxinfo <username or id> - Get Roblox user info",
+    "",
+    "**Utility:**",
+    "5. !help - Show this help list",
+  ];
+
+  msg.reply(helpList.join("\n"));
+};
+
+/* ======= EVENT LISTENER ======= */
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot) return;
+  if (!msg.content.startsWith(PREFIX)) return;
 
   const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
   const cmd = args.shift().toLowerCase();
 
-  try {
-    if (commands[cmd]) await commands[cmd](msg, args);
-    else msg.reply("Unknown command. Use !help");
-  } catch (err) {
-    console.error(err);
-    msg.reply("Command execution failed");
+  if (commands[cmd]) {
+    try {
+      await commands[cmd](msg, args);
+    } catch (err) {
+      console.error("Command execution error:", err);
+      msg.reply("❌ Command execution failed.");
+    }
+  } else {
+    msg.reply("❓ Unknown command. Use !help");
   }
 });
 
-// ---------- Ready ----------
-client.once("ready", () => console.log(`🟥 INTELLIGENCE PROPERTY ONLINE | ${client.user.tag}`));
+/* ======= READY EVENT ======= */
+client.once("ready", () => {
+  console.log(`🟥 Bot online as ${client.user.tag}`);
+});
 
+/* ======= LOGIN ======= */
 client.login(process.env.TOKEN);
