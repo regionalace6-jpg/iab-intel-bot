@@ -1,14 +1,14 @@
 {
-  "name": "advanced-intel-bot",
-  "version": "3.1.0",
-  "description": "100-command intelligence bot",
+  "name": "intelligence-dashboard",
+  "version": "3.0.0",
+  "description": "INTELLIGENCE DASHBOARD - Discord + Roblox Intelligence Bot",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.0",
-    "node-fetch": "^2.6.12"
+    "discord.js": "^14.14.1",
+    "node-fetch": "^3.3.2"
   }
 }
