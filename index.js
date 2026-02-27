@@ -1,326 +1,210 @@
-const {
-    Client,
-    GatewayIntentBits,
-    EmbedBuilder,
-    PermissionsBitField
-} = require("discord.js");
-
-const fetch = require("node-fetch");
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences
-    ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
 const PREFIX = "!";
 
-/* ================= PANEL BUILDER ================= */
-
-function panel(title, fields = []) {
-    return new EmbedBuilder()
-        .setTitle(`🟥 INTELLIGENCE PROPERTY | ${title}`)
-        .setColor("#000000")
-        .addFields(fields)
-        .setTimestamp();
-}
-
-/* ================= READY ================= */
-
-client.once("ready", () => {
-    console.log(`🟥 FINAL BOT ONLINE | ${client.user.tag}`);
-});
-
-/* ================= COMMAND SYSTEM ================= */
-
+// ---------------- HELP COMMAND ----------------
 const commands = {};
 
-/* =====================================================
-   🔹 HELP
-===================================================== */
-
 commands.help = async (msg) => {
-    const embed = panel("Command List", [
-        { name: "Discord", value: "`userinfo avatar banner serverinfo membercount roleinfo permissions joinedat createdat botinfo`" },
-        { name: "Roblox", value: "`robloxinfo robloxavatar robloxfriends robloxfollowers robloxfollowing robloxgroups robloxdescription robloxcreated robloxstatus robloxid`" },
-        { name: "OSINT", value: "`iplookup geoip dnslookup whois httpheaders redirectcheck domainage reverseip subdomains pinghost`" }
-    ]);
-    msg.reply({ embeds: [embed] });
+  const helpList = [
+    // Discord Info
+    "!userinfo <ID or mention> - Full Discord info",
+    "!avatar <ID or mention> - Shows avatar",
+    "!banner <ID or mention> - Shows banner",
+    "!joinedat <ID or mention> - Server join date",
+    "!createdat <ID or mention> - Account creation date",
+    "!botinfo - Bot stats",
+
+    // Roblox Info
+    "!robloxinfo <username or ID> - Roblox profile",
+    "!robloxavatar <username or ID> - Roblox avatar",
+    "!robloxfriends <username or ID> - Friends count",
+    "!robloxfollowers <username or ID> - Followers count",
+    "!robloxfollowing <username or ID> - Following count",
+    "!robloxgroups <username or ID> - Groups count",
+    "!robloxcreated <username or ID> - Account creation date",
+    "!robloxid <username> - Get Roblox ID",
+
+    // OSINT Tools
+    "!iplookup <IP> - IP location info",
+    "!dnslookup <domain> - DNS info",
+    "!whois <domain> - Domain WHOIS",
+    "!httpheaders <URL> - HTTP headers",
+    "!redirectcheck <URL> - Redirect chain",
+    "!domainage <domain> - Domain age",
+    "!reverseip <IP> - Domains on IP",
+    "!subdomains <domain> - Subdomains",
+    "!pinghost <host> - Check if host is up",
+    "!intel <ID or mention> [robloxUsername] - All-in-one panel"
+  ];
+
+  const embed = new EmbedBuilder()
+    .setTitle("🟥 INTELLIGENCE PROPERTY COMMANDS")
+    .setDescription(helpList.map((c, i) => `${i+1}. ${c}`).join("\n"))
+    .setColor("#000000")
+    .setTimestamp();
+
+  msg.reply({ embeds: [embed] });
 };
 
-/* =====================================================
-   🔹 DISCORD INTEL
-===================================================== */
-
+// ---------------- DISCORD USERINFO ----------------
 commands.userinfo = async (msg, args) => {
-    let user = msg.mentions.users.first() || msg.author;
+  let user;
+  if(args[0]) {
+    try { user = await client.users.fetch(args[0]); } catch { user = msg.author; }
+  } else {
+    user = msg.mentions.users.first() || msg.author;
+  }
 
-    if (args[0]) {
-        try { user = await client.users.fetch(args[0]); }
-        catch {}
+  const member = msg.guild.members.cache.get(user.id);
+  const accountAge = Math.floor((Date.now() - user.createdTimestamp)/86400000);
+  const serverJoinAge = member ? Math.floor((Date.now() - member.joinedTimestamp)/86400000) : "N/A";
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🟥 Discord Intelligence Profile | ${user.tag}`)
+    .setThumbnail(user.displayAvatarURL({dynamic:true, size:512}))
+    .addFields([
+      {name:"Username", value:user.tag, inline:true},
+      {name:"User ID", value:user.id, inline:true},
+      {name:"Bot?", value:user.bot ? "Yes" : "No", inline:true},
+      {name:"Account Created", value:`<t:${Math.floor(user.createdTimestamp/1000)}:F>`},
+      {name:"Account Age", value:accountAge+" days", inline:true},
+      {name:"Server Joined", value: member ? `<t:${Math.floor(member.joinedTimestamp/1000)}:F>` : "N/A"},
+      {name:"Server Join Age", value: serverJoinAge+" days", inline:true}
+    ])
+    .setColor("#000000")
+    .setTimestamp();
+
+  msg.reply({ embeds: [embed] });
+};
+
+// ---------------- ROBLOX INFO ----------------
+async function getRobloxData(username) {
+  try {
+    let targetId;
+    if(isNaN(username)) {
+      const res = await fetch("https://users.roblox.com/v1/usernames/users", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({usernames:[username]})
+      });
+      const data = await res.json();
+      if(!data.data.length) return null;
+      targetId = data.data[0].id;
+    } else {
+      targetId = username;
     }
 
-    const member = msg.guild.members.cache.get(user.id);
+    const info = await fetch(`https://users.roblox.com/v1/users/${targetId}`).then(r=>r.json());
+    const avatar = `https://www.roblox.com/headshot-thumbnail/image?userId=${targetId}&width=420&height=420&format=png`;
 
-    const embed = panel("Discord User Profile", [
-        { name: "Username", value: user.tag, inline: true },
-        { name: "User ID", value: user.id, inline: true },
-        { name: "Bot?", value: user.bot ? "Yes" : "No", inline: true },
-        { name: "Created", value: `<t:${Math.floor(user.createdTimestamp/1000)}:F>` },
-        { name: "Account Age (days)", value: Math.floor((Date.now()-user.createdTimestamp)/86400000).toString(), inline:true },
-        { name: "Joined Server", value: member ? `<t:${Math.floor(member.joinedTimestamp/1000)}:F>` : "Not in server" }
-    ]).setThumbnail(user.displayAvatarURL({ dynamic:true, size:512 }));
+    const friends = await fetch(`https://friends.roblox.com/v1/users/${targetId}/friends/count`).then(r=>r.json());
+    const followers = await fetch(`https://friends.roblox.com/v1/users/${targetId}/followers/count`).then(r=>r.json());
+    const following = await fetch(`https://friends.roblox.com/v1/users/${targetId}/followings/count`).then(r=>r.json());
+    const groups = await fetch(`https://groups.roblox.com/v2/users/${targetId}/groups/roles`).then(r=>r.json());
 
-    msg.reply({ embeds: [embed] });
-};
-
-commands.avatar = async (msg) => {
-    const user = msg.mentions.users.first() || msg.author;
-    msg.reply(user.displayAvatarURL({ dynamic:true, size:1024 }));
-};
-
-commands.banner = async (msg) => {
-    const user = msg.mentions.users.first() || msg.author;
-    const fetched = await client.users.fetch(user.id, { force:true });
-    if (!fetched.banner) return msg.reply("No banner.");
-    msg.reply(`https://cdn.discordapp.com/banners/${user.id}/${fetched.banner}?size=1024`);
-};
-
-commands.serverinfo = async (msg) => {
-    const g = msg.guild;
-    const embed = panel("Server Info", [
-        { name:"Name", value:g.name, inline:true },
-        { name:"ID", value:g.id, inline:true },
-        { name:"Members", value:g.memberCount.toString(), inline:true },
-        { name:"Boosts", value:g.premiumSubscriptionCount.toString(), inline:true },
-        { name:"Created", value:`<t:${Math.floor(g.createdTimestamp/1000)}:F>` }
-    ]).setThumbnail(g.iconURL({ dynamic:true }));
-
-    msg.reply({ embeds:[embed] });
-};
-
-commands.membercount = async (msg) => msg.reply(`Members: ${msg.guild.memberCount}`);
-
-commands.roleinfo = async (msg) => {
-    const role = msg.mentions.roles.first();
-    if (!role) return msg.reply("Mention a role.");
-    const embed = panel("Role Info", [
-        { name:"Name", value:role.name, inline:true },
-        { name:"ID", value:role.id, inline:true },
-        { name:"Members", value:role.members.size.toString(), inline:true }
-    ]);
-    msg.reply({ embeds:[embed] });
-};
-
-commands.permissions = async (msg) => {
-    const member = msg.mentions.members.first() || msg.member;
-    msg.reply(member.permissions.toArray().join(", ").substring(0,1900));
-};
-
-commands.joinedat = async (msg) => {
-    const member = msg.mentions.members.first() || msg.member;
-    msg.reply(`<t:${Math.floor(member.joinedTimestamp/1000)}:F>`);
-};
-
-commands.createdat = async (msg) => {
-    const user = msg.mentions.users.first() || msg.author;
-    msg.reply(`<t:${Math.floor(user.createdTimestamp/1000)}:F>`);
-};
-
-commands.botinfo = async (msg) => {
-    const embed = panel("Bot Info", [
-        { name:"Ping", value:client.ws.ping + "ms", inline:true },
-        { name:"Servers", value:client.guilds.cache.size.toString(), inline:true }
-    ]);
-    msg.reply({ embeds:[embed] });
-};
-
-/* =====================================================
-   🔹 ROBLOX INTEL
-===================================================== */
-
-async function getRobloxId(username) {
-    const res = await fetch("https://users.roblox.com/v1/usernames/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usernames: [username] })
-    });
-    const data = await res.json();
-    if (!data.data.length) return null;
-    return data.data[0].id;
+    return {
+      id: targetId,
+      info,
+      avatar,
+      friends: friends.count,
+      followers: followers.count,
+      following: following.count,
+      groups: groups.data.length
+    };
+  } catch(e) {
+    return null;
+  }
 }
 
 commands.robloxinfo = async (msg, args) => {
-    if (!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    if (!id) return msg.reply("User not found.");
+  if(!args[0]) return msg.reply("Provide Roblox username or ID");
+  const data = await getRobloxData(args[0]);
+  if(!data) return msg.reply("Roblox user not found");
 
-    const info = await fetch(`https://users.roblox.com/v1/users/${id}`).then(r=>r.json());
-    const friends = await fetch(`https://friends.roblox.com/v1/users/${id}/friends/count`).then(r=>r.json());
-    const followers = await fetch(`https://friends.roblox.com/v1/users/${id}/followers/count`).then(r=>r.json());
-    const following = await fetch(`https://friends.roblox.com/v1/users/${id}/followings/count`).then(r=>r.json());
-    const groups = await fetch(`https://groups.roblox.com/v2/users/${id}/groups/roles`).then(r=>r.json());
+  const embed = new EmbedBuilder()
+    .setTitle(`🟥 Roblox Profile | ${data.info.name}`)
+    .setThumbnail(data.avatar)
+    .addFields([
+      {name:"Username", value:data.info.name, inline:true},
+      {name:"Display Name", value:data.info.displayName, inline:true},
+      {name:"User ID", value:data.id.toString(), inline:true},
+      {name:"Friends", value:data.friends.toString(), inline:true},
+      {name:"Followers", value:data.followers.toString(), inline:true},
+      {name:"Following", value:data.following.toString(), inline:true},
+      {name:"Groups", value:data.groups.toString(), inline:true},
+      {name:"Created", value:new Date(data.info.created).toDateString(), inline:true}
+    ])
+    .setColor("#000000")
+    .setTimestamp();
 
-    const embed = panel("Roblox Profile", [
-        { name:"Username", value:info.name, inline:true },
-        { name:"Display Name", value:info.displayName, inline:true },
-        { name:"User ID", value:id.toString(), inline:true },
-        { name:"Created", value:new Date(info.created).toDateString() },
-        { name:"Friends", value:friends.count.toString(), inline:true },
-        { name:"Followers", value:followers.count.toString(), inline:true },
-        { name:"Following", value:following.count.toString(), inline:true },
-        { name:"Groups", value:groups.data.length.toString(), inline:true }
-    ]).setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${id}&width=420&height=420&format=png`);
-
-    msg.reply({ embeds:[embed] });
+  msg.reply({ embeds:[embed] });
 };
 
-commands.robloxavatar = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    msg.reply(`https://www.roblox.com/headshot-thumbnail/image?userId=${id}&width=420&height=420&format=png`);
+// ---------------- INTEL PANEL ----------------
+commands.intel = async (msg, args) => {
+  let user;
+  if(args[0]) {
+    try { user = await client.users.fetch(args[0]); } catch { user = msg.author; }
+  } else {
+    user = msg.mentions.users.first() || msg.author;
+  }
+
+  const member = msg.guild.members.cache.get(user.id);
+  const accountAge = Math.floor((Date.now() - user.createdTimestamp)/86400000);
+  const serverJoinAge = member ? Math.floor((Date.now() - member.joinedTimestamp)/86400000) : "N/A";
+
+  let robloxData = null;
+  if(args[1]) robloxData = await getRobloxData(args[1]);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🟥 INTELLIGENCE DASHBOARD | ${user.tag}`)
+    .setThumbnail(user.displayAvatarURL({dynamic:true, size:512}))
+    .setColor("#000000")
+    .addFields([
+      {name:"Discord Username", value:user.tag, inline:true},
+      {name:"User ID", value:user.id, inline:true},
+      {name:"Bot?", value:user.bot ? "Yes" : "No", inline:true},
+      {name:"Account Created", value:`<t:${Math.floor(user.createdTimestamp/1000)}:F>`},
+      {name:"Account Age", value:accountAge+" days", inline:true},
+      {name:"Server Joined", value:member ? `<t:${Math.floor(member.joinedTimestamp/1000)}:F>` : "N/A"},
+      {name:"Server Join Age", value:serverJoinAge+" days", inline:true},
+      {name:"Roblox Username", value: robloxData ? robloxData.info.name : "N/A", inline:true},
+      {name:"Display Name", value: robloxData ? robloxData.info.displayName : "N/A", inline:true},
+      {name:"Roblox ID", value: robloxData ? robloxData.id.toString() : "N/A", inline:true},
+      {name:"Friends", value: robloxData ? robloxData.friends.toString() : "N/A", inline:true},
+      {name:"Followers", value: robloxData ? robloxData.followers.toString() : "N/A", inline:true},
+      {name:"Following", value: robloxData ? robloxData.following.toString() : "N/A", inline:true},
+      {name:"Groups", value: robloxData ? robloxData.groups.toString() : "N/A", inline:true},
+      {name:"Roblox Created", value: robloxData ? new Date(robloxData.info.created).toDateString() : "N/A", inline:true}
+    ])
+    .setImage(robloxData ? robloxData.avatar : null)
+    .setTimestamp();
+
+  msg.reply({ embeds:[embed] });
 };
 
-commands.robloxfriends = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const data = await fetch(`https://friends.roblox.com/v1/users/${id}/friends/count`).then(r=>r.json());
-    msg.reply(`Friends: ${data.count}`);
-};
+// ---------------- MESSAGE HANDLER ----------------
+client.on("messageCreate", async msg => {
+  if(msg.author.bot) return;
+  if(!msg.content.startsWith(PREFIX)) return;
 
-commands.robloxfollowers = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const data = await fetch(`https://friends.roblox.com/v1/users/${id}/followers/count`).then(r=>r.json());
-    msg.reply(`Followers: ${data.count}`);
-};
+  const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
+  const cmd = args.shift().toLowerCase();
 
-commands.robloxfollowing = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const data = await fetch(`https://friends.roblox.com/v1/users/${id}/followings/count`).then(r=>r.json());
-    msg.reply(`Following: ${data.count}`);
-};
+  if(commands[cmd]) {
+    try { await commands[cmd](msg, args); } catch(e){ msg.reply("Command failed"); console.log(e); }
+  } else msg.reply("Unknown command. Use !help");
+});
 
-commands.robloxgroups = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const data = await fetch(`https://groups.roblox.com/v2/users/${id}/groups/roles`).then(r=>r.json());
-    msg.reply(`Groups: ${data.data.length}`);
-};
-
-commands.robloxdescription = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const info = await fetch(`https://users.roblox.com/v1/users/${id}`).then(r=>r.json());
-    msg.reply(info.description || "No description.");
-};
-
-commands.robloxcreated = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const info = await fetch(`https://users.roblox.com/v1/users/${id}`).then(r=>r.json());
-    msg.reply(new Date(info.created).toDateString());
-};
-
-commands.robloxstatus = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    const data = await fetch(`https://presence.roblox.com/v1/presence/users`,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({userIds:[id]})
-    }).then(r=>r.json());
-    msg.reply(`Presence Type: ${data.userPresences[0].userPresenceType}`);
-};
-
-commands.robloxid = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide username.");
-    const id = await getRobloxId(args[0]);
-    msg.reply(`User ID: ${id}`);
-};
-
-/* =====================================================
-   🔹 OSINT
-===================================================== */
-
-commands.iplookup = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide IP.");
-    const data = await fetch(`http://ip-api.com/json/${args[0]}`).then(r=>r.json());
-    msg.reply("```json\n"+JSON.stringify(data,null,2)+"\n```");
-};
-
-commands.geoip = commands.iplookup;
-
-commands.dnslookup = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide domain.");
-    const data = await fetch(`https://dns.google/resolve?name=${args[0]}`).then(r=>r.json());
-    msg.reply("```json\n"+JSON.stringify(data,null,2)+"\n```");
-};
-
-commands.whois = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide domain.");
-    const data = await fetch(`https://api.hackertarget.com/whois/?q=${args[0]}`).then(r=>r.text());
-    msg.reply("```"+data.substring(0,1900)+"```");
-};
-
-commands.httpheaders = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide URL.");
-    const res = await fetch(args[0]);
-    msg.reply("```json\n"+JSON.stringify(res.headers.raw(),null,2)+"\n```");
-};
-
-commands.redirectcheck = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide URL.");
-    const res = await fetch(args[0],{redirect:"manual"});
-    msg.reply(`Status: ${res.status}`);
-};
-
-commands.domainage = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide domain.");
-    const data = await fetch(`https://api.hackertarget.com/whois/?q=${args[0]}`).then(r=>r.text());
-    msg.reply(data.includes("Creation Date") ? "Creation date found in WHOIS." : "Not found.");
-};
-
-commands.reverseip = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide IP.");
-    const data = await fetch(`https://api.hackertarget.com/reverseiplookup/?q=${args[0]}`).then(r=>r.text());
-    msg.reply("```"+data.substring(0,1900)+"```");
-};
-
-commands.subdomains = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide domain.");
-    const data = await fetch(`https://api.hackertarget.com/hostsearch/?q=${args[0]}`).then(r=>r.text());
-    msg.reply("```"+data.substring(0,1900)+"```");
-};
-
-commands.pinghost = async (msg,args)=>{
-    if(!args[0]) return msg.reply("Provide host.");
-    const data = await fetch(`https://api.hackertarget.com/nping/?q=${args[0]}`).then(r=>r.text());
-    msg.reply("```"+data.substring(0,1900)+"```");
-};
-
-/* ================= HANDLER ================= */
-
-client.on("messageCreate", async (msg)=>{
-    if(msg.author.bot) return;
-    if(!msg.content.startsWith(PREFIX)) return;
-
-    const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
-    const cmd = args.shift().toLowerCase();
-
-    if(!commands[cmd]) return msg.reply("Unknown command.");
-
-    try {
-        await commands[cmd](msg,args);
-    } catch(err){
-        console.error(err);
-        msg.reply("Error executing command.");
-    }
+// ---------------- READY ----------------
+client.once("ready", () => {
+  console.log(`🟥 INTELLIGENCE PROPERTY ONLINE | ${client.user.tag}`);
 });
 
 client.login(process.env.TOKEN);
