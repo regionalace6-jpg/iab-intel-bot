@@ -1,13 +1,14 @@
 {
   "name": "advanced-intel-bot",
-  "version": "3.0.0",
-  "description": "All-in-one Discord intelligence, Roblox, OSINT & utility bot",
+  "version": "3.1.0",
+  "description": "100-command intelligence bot",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.0",
-    "node-fetch": "^3.3.1"
+    "node-fetch": "^2.6.12"
   }
 }
