@@ -1,14 +1,11 @@
 require("dotenv").config();
-const { 
-    Client, 
-    GatewayIntentBits, 
-    EmbedBuilder, 
-    Partials 
-} = require("discord.js");
-
+const { Client, GatewayIntentBits, EmbedBuilder, Partials } = require("discord.js");
 const axios = require("axios");
 const dns = require("dns").promises;
-const whois = require("whois-json");
+
+process.on("unhandledRejection", (err) => {
+    console.error("Unhandled Rejection:", err);
+});
 
 const client = new Client({
     intents: [
@@ -24,19 +21,18 @@ const PREFIX = "!";
 
 function Panel(title, fields) {
     return new EmbedBuilder()
-        .setColor("#0a0a0a")
+        .setColor("#000000")
         .setTitle(`INTELLIGENCE DASHBOARD | ${title}`)
         .addFields(fields)
         .setFooter({ text: "INTELLIGENCE SYSTEM v1.0" })
         .setTimestamp();
 }
 
-client.on("ready", () => {
-    console.log(`Logged in as ${client.user.tag}`);
+client.once("ready", () => {
+    console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
 client.on("messageCreate", async (msg) => {
-
     if (!msg.content.startsWith(PREFIX) || msg.author.bot) return;
 
     const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
@@ -47,7 +43,6 @@ client.on("messageCreate", async (msg) => {
     // ==========================
 
     if (cmd === "help") {
-
         const category = args[0]?.toLowerCase();
 
         if (!category) {
@@ -55,7 +50,7 @@ client.on("messageCreate", async (msg) => {
                 embeds: [Panel("COMMAND DIRECTORY", [
                     { name: "🟦 Discord", value: "`!help discord`", inline: true },
                     { name: "🟩 Roblox", value: "`!help roblox`", inline: true },
-                    { name: "🟥 OSINT", value: "`!help osint`", inline: true },
+                    { name: "🟥 OSINT", value: "`!help osint`", inline: true }
                 ])]
             });
         }
@@ -90,7 +85,7 @@ client.on("messageCreate", async (msg) => {
     }
 
     // ==========================
-    // DISCORD GLOBAL USER LOOKUP
+    // DISCORD USER INTEL
     // ==========================
 
     if (cmd === "user") {
@@ -101,16 +96,46 @@ client.on("messageCreate", async (msg) => {
             const user = await client.users.fetch(id);
 
             const embed = Panel("DISCORD USER INTEL", [
-                { name: "Username", value: `${user.tag}` },
+                { name: "Username", value: user.tag },
                 { name: "User ID", value: user.id },
-                { name: "Account Created", value: `<t:${Math.floor(user.createdTimestamp/1000)}:F>` }
+                { name: "Created", value: `<t:${Math.floor(user.createdTimestamp / 1000)}:F>` }
             ]).setThumbnail(user.displayAvatarURL({ size: 512 }));
 
-            msg.reply({ embeds: [embed] });
+            return msg.reply({ embeds: [embed] });
 
         } catch {
-            msg.reply("User not found.");
+            return msg.reply("User not found.");
         }
+    }
+
+    // ==========================
+    // DISCORD AVATAR
+    // ==========================
+
+    if (cmd === "avatar") {
+        const id = args[0];
+        if (!id) return msg.reply("Provide user ID.");
+
+        try {
+            const user = await client.users.fetch(id);
+            return msg.reply(user.displayAvatarURL({ size: 1024 }));
+        } catch {
+            return msg.reply("User not found.");
+        }
+    }
+
+    // ==========================
+    // SERVER INFO
+    // ==========================
+
+    if (cmd === "server") {
+        const embed = Panel("SERVER INTEL", [
+            { name: "Server Name", value: msg.guild.name },
+            { name: "Members", value: msg.guild.memberCount.toString() },
+            { name: "Created", value: `<t:${Math.floor(msg.guild.createdTimestamp / 1000)}:F>` }
+        ]);
+
+        return msg.reply({ embeds: [embed] });
     }
 
     // ==========================
@@ -122,14 +147,21 @@ client.on("messageCreate", async (msg) => {
         if (!input) return msg.reply("Provide username or ID.");
 
         try {
-            let userId = input;
+            let userId;
 
             if (isNaN(input)) {
                 const res = await axios.post(
                     "https://users.roblox.com/v1/usernames/users",
-                    { usernames: [input] }
+                    { usernames: [input], excludeBannedUsers: false }
                 );
+
+                if (!res.data.data.length) {
+                    return msg.reply("Roblox user not found.");
+                }
+
                 userId = res.data.data[0].id;
+            } else {
+                userId = input;
             }
 
             const userInfo = await axios.get(
@@ -151,21 +183,21 @@ client.on("messageCreate", async (msg) => {
             const embed = Panel("ROBLOX INTEL", [
                 { name: "Username", value: userInfo.data.name, inline: true },
                 { name: "User ID", value: userId.toString(), inline: true },
-                { name: "Display Name", value: userInfo.data.displayName },
+                { name: "Display Name", value: userInfo.data.displayName || "None" },
                 { name: "Description", value: userInfo.data.description || "None" },
                 { name: "Top Badges", value: badgeList }
-            ])
-                .setThumbnail(avatar.data.data[0].imageUrl);
+            ]).setThumbnail(avatar.data.data?.[0]?.imageUrl || null);
 
-            msg.reply({ embeds: [embed] });
+            return msg.reply({ embeds: [embed] });
 
-        } catch {
-            msg.reply("Roblox user not found.");
+        } catch (err) {
+            console.error(err);
+            return msg.reply("Roblox lookup failed.");
         }
     }
 
     // ==========================
-    // IP LOOKUP (Free API)
+    // IP LOOKUP
     // ==========================
 
     if (cmd === "ip") {
@@ -177,15 +209,16 @@ client.on("messageCreate", async (msg) => {
             const data = res.data;
 
             const embed = Panel("IP INTEL", [
-                { name: "IP", value: data.query },
-                { name: "Country", value: data.country },
-                { name: "City", value: data.city },
-                { name: "ISP", value: data.isp }
+                { name: "IP", value: data.query || "Unknown" },
+                { name: "Country", value: data.country || "Unknown" },
+                { name: "City", value: data.city || "Unknown" },
+                { name: "ISP", value: data.isp || "Unknown" }
             ]);
 
-            msg.reply({ embeds: [embed] });
+            return msg.reply({ embeds: [embed] });
+
         } catch {
-            msg.reply("IP lookup failed.");
+            return msg.reply("IP lookup failed.");
         }
     }
 
@@ -199,14 +232,14 @@ client.on("messageCreate", async (msg) => {
 
         try {
             const records = await dns.resolve(domain);
-            msg.reply(`DNS Records:\n${records.join("\n")}`);
+            return msg.reply("DNS Records:\n" + records.join("\n"));
         } catch {
-            msg.reply("DNS lookup failed.");
+            return msg.reply("DNS lookup failed.");
         }
     }
 
     // ==========================
-    // DOMAIN WHOIS
+    // DOMAIN LOOKUP (FREE API)
     // ==========================
 
     if (cmd === "domain") {
@@ -214,19 +247,22 @@ client.on("messageCreate", async (msg) => {
         if (!domain) return msg.reply("Provide domain.");
 
         try {
-            const data = await whois(domain);
+            const res = await axios.get(`https://api.whois.vu/?q=${domain}`);
+            const data = res.data;
 
-            const embed = Panel("WHOIS INTEL", [
+            const embed = Panel("DOMAIN INTEL", [
                 { name: "Domain", value: domain },
                 { name: "Registrar", value: data.registrar || "Unknown" },
-                { name: "Created", value: data.creationDate || "Unknown" },
-                { name: "Expires", value: data.registrarRegistrationExpirationDate || "Unknown" }
+                { name: "Created", value: data.created || "Unknown" },
+                { name: "Expires", value: data.expires || "Unknown" },
+                { name: "Country", value: data.country || "Unknown" }
             ]);
 
-            msg.reply({ embeds: [embed] });
+            return msg.reply({ embeds: [embed] });
 
-        } catch {
-            msg.reply("WHOIS failed.");
+        } catch (err) {
+            console.error(err);
+            return msg.reply("Domain lookup failed.");
         }
     }
 
