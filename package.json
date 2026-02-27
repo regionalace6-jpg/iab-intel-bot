@@ -1,6 +1,7 @@
 {
   "name": "intelligence-dashboard",
   "version": "1.0.0",
+  "description": "INTELLIGENCE DASHBOARD Discord Bot",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
