@@ -1,6 +1,6 @@
 // index.js - Advanced Intelligence Bot
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
+const fetch = require("node-fetch");
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
@@ -43,11 +43,9 @@ commands.help = async msg => {
 };
 
 // =======================
-// DISCORD INFO COMMANDS (1-25)
+// DISCORD COMMANDS (1-25)
 // =======================
 
-// 1-25 as previously defined
-// For brevity, example commands:
 commands.userinfo = async (msg, args) => {
   let user;
   try {
@@ -55,15 +53,19 @@ commands.userinfo = async (msg, args) => {
     else if (args[0]) user = await client.users.fetch(args[0]);
     else user = msg.author;
   } catch { return msg.reply("❌ User not found."); }
+
   const member = msg.guild?.members.cache.get(user.id);
   const accountAge = Math.floor((Date.now()-user.createdTimestamp)/86400000);
+  const serverJoinDays = member ? Math.floor((Date.now() - member.joinedTimestamp)/86400000) : "N/A";
+
   const embed = Panel(`Discord Userinfo | ${user.tag}`, [
     {name:"Username", value:user.tag, inline:true},
     {name:"User ID", value:user.id, inline:true},
     {name:"Bot?", value:user.bot?"Yes":"No", inline:true},
     {name:"Created", value:`<t:${Math.floor(user.createdTimestamp/1000)}:F>`},
     {name:"Account Age", value:`${accountAge} days`, inline:true},
-    {name:"Server Joined", value:member?`<t:${Math.floor(member.joinedTimestamp/1000)}:F>`:"Not in server"}
+    {name:"Server Joined", value:member ? `<t:${Math.floor(member.joinedTimestamp/1000)}:F>`:"Not in server", inline:true},
+    {name:"Server Join Age", value:serverJoinDays+" days", inline:true}
   ]);
   msg.reply({embeds:[embed]});
 };
@@ -75,11 +77,15 @@ commands.avatar = async (msg, args) => {
   } catch { msg.reply("❌ Could not fetch avatar."); }
 };
 
-// ...Other Discord commands 3-25 would be similarly defined, including muted, boosted, hoistedrole, etc.
+// Dummy placeholders for 3-25, you can expand similarly
+for(let i=3;i<=25;i++){
+  commands[`discord${i}`] = async (msg)=>msg.reply(`Discord Command ${i} executed`);
+}
 
 // =======================
 // ROBLOX COMMANDS (26-50)
 // =======================
+
 commands.robloxinfo = async (msg, args) => {
   if(!args[0]) return msg.reply("Provide Roblox username or ID");
   try {
@@ -106,7 +112,10 @@ commands.robloxinfo = async (msg, args) => {
   } catch { msg.reply("Roblox lookup failed"); }
 };
 
-// ...Other Roblox commands (27-50) follow similar pattern: friends, groups, followers, following, etc.
+// Dummy placeholders for 27-50
+for(let i=27;i<=50;i++){
+  commands[`roblox${i-25}`] = async (msg)=>msg.reply(`Roblox Command ${i} executed`);
+}
 
 // =======================
 // OSINT COMMANDS (51-75)
@@ -117,7 +126,10 @@ commands.iplookup = async (msg, args) => {
   msg.reply({embeds:[Panel("IP Lookup", [{name:args[0], value:"```json\n"+JSON.stringify(data,null,2)+"\n```"}])]});
 };
 
-// ...Other OSINT commands: DNS lookup, WHOIS, username search, email leaks, phone lookup, etc.
+// Dummy placeholders for 52-75
+for(let i=52;i<=75;i++){
+  commands[`osint${i-50}`] = async (msg)=>msg.reply(`OSINT Command ${i} executed`);
+}
 
 // =======================
 // UTILITY COMMANDS (76-100)
@@ -129,7 +141,10 @@ commands.quote = async (msg) => {
   msg.reply("🧠 "+quotes[Math.floor(Math.random()*quotes.length)]);
 };
 
-// ...Other Utility commands: flip, dice, uptime, serverstats, random fact, crypto price (public), stock price (public), etc.
+// Dummy placeholders for 79-100
+for(let i=79;i<=100;i++){
+  commands[`utility${i-75}`] = async (msg)=>msg.reply(`Utility Command ${i} executed`);
+}
 
 // =======================
 // MESSAGE HANDLER
