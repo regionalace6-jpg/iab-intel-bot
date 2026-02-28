@@ -7,20 +7,17 @@ const {
 
 const axios = require("axios");
 const moment = require("moment");
-const fs = require("fs");
 const http = require("http");
 
 const TOKEN = process.env.TOKEN;
 const PREFIX = "*";
-const OWNER_ID = "924501682619052042";
 
-/* Keep Alive */
+/* KEEP ALIVE */
+
 http.createServer((req, res) => {
     res.write("Alive");
     res.end();
 }).listen(process.env.PORT || 3000);
-
-/* Client */
 
 const client = new Client({
     intents: [
@@ -33,109 +30,54 @@ const client = new Client({
     partials: [Partials.Channel, Partials.User, Partials.Message]
 });
 
-/* Team Access */
-
-const ACCESS_FILE = "./access.json";
-
-let accessList = new Set([OWNER_ID]);
-
-if (fs.existsSync(ACCESS_FILE)) {
-    try {
-        accessList = new Set(JSON.parse(fs.readFileSync(ACCESS_FILE)));
-    } catch {}
-}
-
-function saveAccess() {
-    fs.writeFileSync(ACCESS_FILE, JSON.stringify([...accessList]));
-}
-
-function hasAccess(id) {
-    return accessList.has(id);
-}
-
-/* Ready */
-
 client.on("ready", () => {
-    console.log(`🔥 Final Boss OSINT Online → ${client.user.tag}`);
+    console.log(`🔥 GOD INTEL ONLINE → ${client.user.tag}`);
 });
 
-/* Commands */
+/* COMMANDS */
 
 client.on("messageCreate", async message => {
 
-    if (message.author.bot) return;
     if (!message.content.startsWith(PREFIX)) return;
+    if (message.author.bot) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
-
-    /* TEAM SYSTEM */
-
-    if (command === "grant") {
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
-
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
-
-        accessList.add(user.id);
-        saveAccess();
-
-        return message.reply("Team access granted ✅");
-    }
-
-    if (command === "revoke") {
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
-
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
-
-        accessList.delete(user.id);
-        saveAccess();
-
-        return message.reply("Team access revoked ❌");
-    }
-
-    if (!hasAccess(message.author.id))
-        return message.reply("Access Denied.");
 
     /* HELP */
 
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🔥 FINAL BOSS INTELLIGENCE SYSTEM")
+            .setTitle("🔥 GOD INTELLIGENCE SYSTEM")
             .setColor("Purple")
             .addFields(
-                { name: "*dlookup", value: "Discord intel report" },
-                { name: "*rlookup", value: "Roblox intel report" },
-                { name: "*osint", value: "OSINT tools" },
-                { name: "*email", value: "Email OSINT search" },
-                { name: "*usersearch", value: "Username OSINT search" }
+                { name: "*dlookup", value: "Discord Intelligence Report" },
+                { name: "*rlookup", value: "Roblox Intelligence Report" },
+                { name: "*osint", value: "OSINT Tools Menu" },
+                { name: "*ip", value: "IP Geolocation Lookup" }
             );
 
         return message.reply({ embeds: [embed] });
     }
 
-    /* OSINT TOOLS */
+    /* OSINT */
 
     if (command === "osint") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🌐 OSINT TOOL MENU")
+            .setTitle("🌐 OSINT POWER TOOLS")
             .setColor("Gold")
             .addFields(
-                { name: "Username OSINT", value: "https://namechk.com" },
-                { name: "Email OSINT", value: "https://epieos.com" },
-                { name: "Social Search", value: "https://whatsmyname.app" },
-                { name: "Username Search", value: "https://instantusername.com" }
+                { name: "Username Search", value: "https://namechk.com" },
+                { name: "Email Search", value: "https://epieos.com" },
+                { name: "Social Search", value: "https://whatsmyname.app" }
             );
 
         return message.reply({ embeds: [embed] });
     }
 
-    /* DISCORD LOOKUP */
+    /* DISCORD INTEL */
 
     if (command === "dlookup") {
 
@@ -147,14 +89,12 @@ client.on("messageCreate", async message => {
                 user = message.mentions.users.first();
             } else if (args[0]) {
                 user = await client.users.fetch(args[0]);
-            } else {
-                return message.reply("Provide user.");
-            }
+            } else return message.reply("Provide user.");
 
             const member = message.guild?.members.cache.get(user.id);
 
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD BOSS REPORT")
+                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
                 .setColor("DarkRed")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
@@ -162,7 +102,8 @@ client.on("messageCreate", async message => {
                     { name: "User ID", value: user.id },
                     { name: "Bot", value: user.bot ? "Yes" : "No" },
                     { name: "Created", value: moment(user.createdAt).format("LLLL") },
-                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
+                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
+                    { name: "Profile Link", value: `https://discord.com/users/${user.id}` }
                 );
 
             return message.reply({ embeds: [embed] });
@@ -172,11 +113,11 @@ client.on("messageCreate", async message => {
         }
     }
 
-    /* ROBLOX LOOKUP */
+    /* ROBLOX INTEL */
 
     if (command === "rlookup") {
 
-        if (!args[0]) return message.reply("Provide Roblox username.");
+        if (!args[0]) return message.reply("Provide username.");
 
         try {
 
@@ -199,7 +140,7 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX BOSS REPORT")
+                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
@@ -207,6 +148,7 @@ client.on("messageCreate", async message => {
                     { name: "Display Name", value: infoRes.data.displayName },
                     { name: "User ID", value: robloxUser.id.toString() },
                     { name: "Bio", value: infoRes.data.description || "No bio" },
+                    { name: "Profile Link", value: `https://www.roblox.com/users/${robloxUser.id}/profile` },
                     { name: "Created", value: moment(infoRes.data.created).format("LLLL") }
                 );
 
@@ -217,36 +159,33 @@ client.on("messageCreate", async message => {
         }
     }
 
-    /* EMAIL OSINT */
+    /* IP */
 
-    if (command === "email") {
+    if (command === "ip") {
 
-        if (!args[0]) return message.reply("Provide email.");
+        if (!args[0]) return message.reply("Provide IP.");
 
-        const embed = new EmbedBuilder()
-            .setTitle("📧 EMAIL OSINT")
-            .setColor("Green")
-            .addFields(
-                { name: "Search Email", value: `https://epieos.com/?q=${args[0]}` }
-            );
+        try {
 
-        return message.reply({ embeds: [embed] });
-    }
+            const geo = await axios.get(`http://ip-api.com/json/${args[0]}`);
 
-    /* USERNAME SEARCH */
+            const data = geo.data;
 
-    if (command === "usersearch") {
+            const embed = new EmbedBuilder()
+                .setTitle("🌍 IP GEO INTEL")
+                .setColor("Green")
+                .addFields(
+                    { name: "Country", value: data.country },
+                    { name: "Region", value: data.regionName },
+                    { name: "City", value: data.city },
+                    { name: "ISP", value: data.isp }
+                );
 
-        if (!args[0]) return message.reply("Provide username.");
+            return message.reply({ embeds: [embed] });
 
-        const embed = new EmbedBuilder()
-            .setTitle("👤 USERNAME OSINT")
-            .setColor("Orange")
-            .addFields(
-                { name: "Search Username", value: `https://whatsmyname.app/?q=${args[0]}` }
-            );
-
-        return message.reply({ embeds: [embed] });
+        } catch {
+            return message.reply("IP lookup failed.");
+        }
     }
 
 });
