@@ -1,16 +1,18 @@
 {
   "name": "intelligence-osint-bot",
   "version": "1.0.0",
-  "description": "Private Intelligence OSINT Utility Bot",
+  "description": "Private Intelligence OSINT Suite",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.6.7",
     "discord.js": "^14.14.1",
-    "dns": "^0.2.2",
-    "node-fetch": "^2.6.7"
+    "whois-json": "^2.0.4"
   }
 }
