@@ -1,6 +1,6 @@
 {
-  "name": "intelligence-bot",
-  "version": "1.0.0",
+  "name": "intelligence-bot-pro",
+  "version": "2.0.0",
   "main": "index.js",
   "dependencies": {
     "axios": "^1.6.0",
