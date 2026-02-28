@@ -1,6 +1,6 @@
 {
-  "name": "god-intel-bot",
-  "version": "6.0.0",
+  "name": "super-elite-intel-bot",
+  "version": "7.0.0",
   "main": "index.js",
   "dependencies": {
     "discord.js": "^14.15.0",
