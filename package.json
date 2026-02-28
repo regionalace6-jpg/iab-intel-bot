@@ -1,6 +1,6 @@
 {
   "name": "intelligence-osint-suite",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "Elite Intelligence OSINT Suite",
   "main": "index.js",
   "type": "commonjs",
@@ -13,6 +13,9 @@
   "dependencies": {
     "axios": "^1.6.8",
     "discord.js": "^14.14.1",
-    "whois-json": "^2.0.4"
+    "whois": "^2.14.0",
+    "geoip-lite": "^1.4.10",
+    "moment": "^2.30.1",
+    "dns": "^0.2.2"
   }
 }
