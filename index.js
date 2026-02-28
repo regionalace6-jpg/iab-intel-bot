@@ -1,260 +1,263 @@
 const {
-  Client,
-  GatewayIntentBits,
-  REST,
-  Routes,
-  SlashCommandBuilder,
-  EmbedBuilder
+    Client,
+    GatewayIntentBits,
+    EmbedBuilder,
+    Partials
 } = require("discord.js");
-
 const axios = require("axios");
-const dns = require("dns").promises;
-const crypto = require("crypto");
+const fs = require("fs");
+const whois = require("whois-json");
 
-const TOKEN = process.env.TOKEN;
+// ==========================
+// CONFIG
+// ==========================
+
+const TOKEN = process.env.BOT_TOKEN; // SET IN HOSTING PANEL
 const OWNER_ID = "924501682619052042";
+const LOG_CHANNEL_ID = "1475519152616898670";
+
+if (!TOKEN) {
+    console.error("BOT_TOKEN environment variable is missing.");
+    process.exit(1);
+}
+
+const PREFIX = "*";
+
+// ==========================
+// CLIENT SETUP
+// ==========================
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.DirectMessages
+    ],
+    partials: [Partials.Channel]
 });
 
-/* ===============================
-   ACCESS CONTROL
-================================= */
+// ==========================
+// PERSISTENT ACCESS STORAGE
+// ==========================
+
+const ACCESS_FILE = "./access.json";
+let accessList = new Set([OWNER_ID]);
+
+if (fs.existsSync(ACCESS_FILE)) {
+    const data = JSON.parse(fs.readFileSync(ACCESS_FILE));
+    accessList = new Set(data);
+}
+
+function saveAccess() {
+    fs.writeFileSync(ACCESS_FILE, JSON.stringify([...accessList]));
+}
 
 function hasAccess(id) {
-  return id === OWNER_ID;
+    return accessList.has(id);
 }
 
-/* ===============================
-   RISK SCORE
-================================= */
+// ==========================
+// LOGGING SYSTEM
+// ==========================
 
-function riskScore(flags) {
-  let score = 0;
-  if (flags.newAccount) score += 30;
-  if (flags.noAvatar) score += 15;
-  return Math.min(score, 100);
-}
+async function logAction(text) {
+    if (!LOG_CHANNEL_ID) return;
 
-/* ===============================
-   SLASH COMMANDS
-================================= */
-
-const commands = [
-  new SlashCommandBuilder()
-    .setName("discord")
-    .setDescription("Discord account intelligence")
-    .addUserOption(o =>
-      o.setName("user").setDescription("Target user").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("roblox")
-    .setDescription("Roblox intelligence")
-    .addStringOption(o =>
-      o.setName("username").setDescription("Username").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("ip")
-    .setDescription("IP intelligence")
-    .addStringOption(o =>
-      o.setName("address").setDescription("IP address").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("email")
-    .setDescription("Email domain intelligence")
-    .addStringOption(o =>
-      o.setName("address").setDescription("Email").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("domain")
-    .setDescription("Domain WHOIS lookup")
-    .addStringOption(o =>
-      o.setName("name").setDescription("Domain").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("hash")
-    .setDescription("SHA256 hash")
-    .addStringOption(o =>
-      o.setName("text").setDescription("Text").setRequired(true)
-    ),
-
-  new SlashCommandBuilder()
-    .setName("base64")
-    .setDescription("Encode or decode base64")
-    .addStringOption(o =>
-      o.setName("mode")
-        .setDescription("encode/decode")
-        .setRequired(true)
-        .addChoices(
-          { name: "encode", value: "encode" },
-          { name: "decode", value: "decode" }
-        )
-    )
-    .addStringOption(o =>
-      o.setName("text").setDescription("Text").setRequired(true)
-    )
-].map(c => c.toJSON());
-
-client.once("ready", async () => {
-  console.log(`Logged in as ${client.user.tag}`);
-
-  const rest = new REST({ version: "10" }).setToken(TOKEN);
-  await rest.put(
-    Routes.applicationCommands(client.user.id),
-    { body: commands }
-  );
-
-  console.log("Slash commands registered globally.");
-});
-
-/* ===============================
-   INTERACTIONS
-================================= */
-
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  if (!hasAccess(interaction.user.id)) {
-    return interaction.reply({
-      content: "🚫 Access denied.",
-      ephemeral: true
-    });
-  }
-
-  await interaction.deferReply({ ephemeral: true });
-
-  const cmd = interaction.commandName;
-
-/* DISCORD */
-
-  if (cmd === "discord") {
-    const user = interaction.options.getUser("user");
-
-    const created = `<t:${Math.floor(user.createdTimestamp / 1000)}:F>`;
-    const ageDays = (Date.now() - user.createdTimestamp) / 86400000;
-
-    const score = riskScore({
-      newAccount: ageDays < 30,
-      noAvatar: !user.avatar
-    });
+    const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+    if (!channel) return;
 
     const embed = new EmbedBuilder()
-      .setTitle("Discord Intelligence")
-      .setThumbnail(user.displayAvatarURL())
-      .addFields(
-        { name: "Tag", value: user.tag },
-        { name: "ID", value: user.id },
-        { name: "Created", value: created },
-        { name: "Risk Score", value: `${score}/100` }
-      )
-      .setColor("Blue");
+        .setTitle("INTELLIGENCE AUDIT LOG")
+        .setColor("DarkGold")
+        .setDescription(text)
+        .setTimestamp();
 
-    return interaction.editReply({ embeds: [embed] });
-  }
+    channel.send({ embeds: [embed] }).catch(() => {});
+}
 
-/* ROBLOX */
+// ==========================
+// READY
+// ==========================
 
-  if (cmd === "roblox") {
-    const username = interaction.options.getString("username");
+client.once("ready", () => {
+    console.log(`OSINT Suite Online: ${client.user.tag}`);
+});
 
-    try {
-      const res = await axios.post(
-        "https://users.roblox.com/v1/usernames/users",
-        { usernames: [username] }
-      );
+// ==========================
+// COMMAND HANDLER
+// ==========================
 
-      const user = res.data.data[0];
-      if (!user) return interaction.editReply("User not found.");
+client.on("messageCreate", async (message) => {
 
-      return interaction.editReply(
-        `Username: ${user.name}\nUser ID: ${user.id}`
-      );
+    if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX)) return;
 
-    } catch {
-      return interaction.editReply("Roblox lookup failed.");
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    // OWNER COMMANDS
+    if (command === "grant") {
+        if (message.author.id !== OWNER_ID)
+            return message.reply("Owner only.");
+
+        const user = message.mentions.users.first();
+        if (!user) return message.reply("Mention user.");
+
+        accessList.add(user.id);
+        saveAccess();
+
+        await logAction(`Access GRANTED to ${user.tag}`);
+        return message.reply(`Access granted to ${user.tag}`);
     }
-  }
 
-/* IP */
+    if (command === "revoke") {
+        if (message.author.id !== OWNER_ID)
+            return message.reply("Owner only.");
 
-  if (cmd === "ip") {
-    const ip = interaction.options.getString("address");
+        const user = message.mentions.users.first();
+        if (!user) return message.reply("Mention user.");
 
-    try {
-      const res = await axios.get(`http://ip-api.com/json/${ip}`);
-      const d = res.data;
+        accessList.delete(user.id);
+        saveAccess();
 
-      return interaction.editReply(
-        `Country: ${d.country}\nISP: ${d.isp}\nASN: ${d.as}`
-      );
-
-    } catch {
-      return interaction.editReply("Invalid IP.");
+        await logAction(`Access REVOKED from ${user.tag}`);
+        return message.reply(`Access revoked from ${user.tag}`);
     }
-  }
 
-/* EMAIL */
-
-  if (cmd === "email") {
-    const email = interaction.options.getString("address");
-    const domain = email.split("@")[1];
-
-    try {
-      const mx = await dns.resolveMx(domain);
-      return interaction.editReply(
-        `Domain: ${domain}\nMX Records: ${mx.length}`
-      );
-
-    } catch {
-      return interaction.editReply("Domain lookup failed.");
+    // ACCESS CHECK
+    if (!hasAccess(message.author.id)) {
+        await logAction(`Unauthorized attempt by ${message.author.tag}`);
+        return message.reply("Access Denied.");
     }
-  }
 
-/* DOMAIN */
+    // =====================
+    // DISCORD LOOKUP
+    // =====================
 
-  if (cmd === "domain") {
-    const domain = interaction.options.getString("name");
+    if (command === "dlookup") {
 
-    try {
-      const res = await axios.get(
-        `https://api.hackertarget.com/whois/?q=${domain}`
-      );
+        let user;
 
-      return interaction.editReply(
-        "```" + res.data.substring(0, 1900) + "```"
-      );
+        if (message.mentions.users.first()) {
+            user = message.mentions.users.first();
+        } else {
+            try {
+                user = await client.users.fetch(args[0]);
+            } catch {
+                return message.reply("Invalid ID.");
+            }
+        }
 
-    } catch {
-      return interaction.editReply("WHOIS lookup failed.");
+        const embed = new EmbedBuilder()
+            .setTitle("DISCORD INTELLIGENCE REPORT")
+            .setColor("DarkRed")
+            .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+            .addFields(
+                { name: "Username", value: user.tag, inline: true },
+                { name: "User ID", value: user.id, inline: true },
+                { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
+                { name: "Created", value: `<t:${parseInt(user.createdTimestamp / 1000)}:R>` }
+            )
+            .setTimestamp();
+
+        await logAction(`Discord lookup: ${user.tag}`);
+        return message.reply({ embeds: [embed] });
     }
-  }
 
-/* HASH */
+    // =====================
+    // ROBLOX LOOKUP
+    // =====================
 
-  if (cmd === "hash") {
-    const text = interaction.options.getString("text");
-    const hash = crypto.createHash("sha256").update(text).digest("hex");
-    return interaction.editReply(hash);
-  }
+    if (command === "rlookup") {
 
-/* BASE64 */
+        if (!args[0]) return message.reply("Provide username.");
 
-  if (cmd === "base64") {
-    const mode = interaction.options.getString("mode");
-    const text = interaction.options.getString("text");
+        try {
+            const userRes = await axios.post(
+                "https://users.roblox.com/v1/usernames/users",
+                { usernames: [args[0]] }
+            );
 
-    if (mode === "encode")
-      return interaction.editReply(Buffer.from(text).toString("base64"));
+            const robloxUser = userRes.data.data[0];
+            if (!robloxUser) return message.reply("User not found.");
 
-    if (mode === "decode")
-      return interaction.editReply(Buffer.from(text, "base64").toString("utf8"));
-  }
+            const infoRes = await axios.get(
+                `https://users.roblox.com/v1/users/${robloxUser.id}`
+            );
+
+            const avatarRes = await axios.get(
+                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png&isCircular=false`
+            );
+
+            const avatar = avatarRes.data.data[0].imageUrl;
+
+            const embed = new EmbedBuilder()
+                .setTitle("ROBLOX INTELLIGENCE REPORT")
+                .setColor("DarkBlue")
+                .setThumbnail(avatar)
+                .addFields(
+                    { name: "Username", value: infoRes.data.name, inline: true },
+                    { name: "Display Name", value: infoRes.data.displayName, inline: true },
+                    { name: "User ID", value: robloxUser.id.toString(), inline: true },
+                    { name: "Bio", value: infoRes.data.description || "No bio." }
+                )
+                .setTimestamp();
+
+            await logAction(`Roblox lookup: ${infoRes.data.name}`);
+            return message.reply({ embeds: [embed] });
+
+        } catch {
+            return message.reply("Lookup failed.");
+        }
+    }
+
+    // =====================
+    // WHOIS
+    // =====================
+
+    if (command === "whois") {
+
+        if (!args[0]) return message.reply("Provide domain.");
+
+        try {
+            const result = await whois(args[0]);
+
+            const embed = new EmbedBuilder()
+                .setTitle("DOMAIN INTELLIGENCE REPORT")
+                .setColor("DarkGreen")
+                .addFields(
+                    { name: "Domain", value: args[0] },
+                    { name: "Registrar", value: result.registrar || "Unknown" },
+                    { name: "Creation Date", value: result.creationDate || "Unknown" },
+                    { name: "Expiry Date", value: result.registryExpiryDate || "Unknown" }
+                )
+                .setTimestamp();
+
+            await logAction(`WHOIS lookup: ${args[0]}`);
+            return message.reply({ embeds: [embed] });
+
+        } catch {
+            return message.reply("WHOIS failed.");
+        }
+    }
+
+    // HELP
+    if (command === "help") {
+        const embed = new EmbedBuilder()
+            .setTitle("ELITE INTELLIGENCE PANEL")
+            .setColor("DarkPurple")
+            .addFields(
+                { name: "*dlookup <id/@>", value: "Discord scan" },
+                { name: "*rlookup <username>", value: "Roblox scan" },
+                { name: "*whois <domain>", value: "Domain lookup" },
+                { name: "*grant @user", value: "Grant access (Owner)" },
+                { name: "*revoke @user", value: "Revoke access (Owner)" }
+            )
+            .setTimestamp();
+
+        return message.reply({ embeds: [embed] });
+    }
 
 });
 
