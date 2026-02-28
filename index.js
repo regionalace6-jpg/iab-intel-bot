@@ -7,14 +7,14 @@ const {
 
 const axios = require("axios");
 const moment = require("moment");
-const http = require("http");
 const fs = require("fs");
+const http = require("http");
 
 const TOKEN = process.env.TOKEN;
 const PREFIX = "*";
 const OWNER_ID = "924501682619052042";
 
-/* Keep Alive (Railway) */
+/* Keep Alive */
 http.createServer((req, res) => {
     res.write("Alive");
     res.end();
@@ -56,29 +56,62 @@ function hasAccess(id) {
 /* Ready */
 
 client.on("ready", () => {
-    console.log(`Online → ${client.user.tag}`);
+    console.log(`Legendary OSINT Online → ${client.user.tag}`);
 });
 
 /* Commands */
 
 client.on("messageCreate", async message => {
 
-    if (!message.content.startsWith(PREFIX)) return;
     if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
+
+    /* TEAM ACCESS */
+
+    if (command === "grant") {
+
+        if (message.author.id !== OWNER_ID)
+            return message.reply("Owner only.");
+
+        const user = message.mentions.users.first();
+        if (!user) return message.reply("Mention user.");
+
+        accessList.add(user.id);
+        saveAccess();
+
+        return message.reply("Team access granted ✅");
+    }
+
+    if (command === "revoke") {
+
+        if (message.author.id !== OWNER_ID)
+            return message.reply("Owner only.");
+
+        const user = message.mentions.users.first();
+        if (!user) return message.reply("Mention user.");
+
+        accessList.delete(user.id);
+        saveAccess();
+
+        return message.reply("Team access revoked ❌");
+    }
+
+    if (!hasAccess(message.author.id))
+        return message.reply("Access Denied.");
 
     /* HELP */
 
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🧠 OSINT INTELLIGENCE SYSTEM")
+            .setTitle("🧠 LEGENDARY OSINT SYSTEM")
             .setColor("Purple")
             .addFields(
-                { name: "*dlookup", value: "Discord public profile intel" },
-                { name: "*rlookup", value: "Roblox public profile intel" },
+                { name: "*dlookup", value: "Discord intelligence report" },
+                { name: "*rlookup", value: "Roblox intelligence report" },
                 { name: "*osint", value: "OSINT tool menu" }
             );
 
@@ -93,32 +126,15 @@ client.on("messageCreate", async message => {
             .setTitle("🌐 OSINT TOOLKIT")
             .setColor("Gold")
             .addFields(
-                { name: "Discord Lookup", value: "https://discordhub.com/user/search" },
-                { name: "Roblox Lookup", value: "https://www.roblox.com/search/users" },
                 { name: "Username Search", value: "https://namechk.com" },
-                { name: "Email Search", value: "https://epieos.com" }
+                { name: "Email OSINT", value: "https://epieos.com" },
+                { name: "Social Search", value: "https://whatsmyname.app" }
             );
 
         return message.reply({ embeds: [embed] });
     }
 
-    /* GRANT */
-
-    if (command === "grant") {
-
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
-
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
-
-        accessList.add(user.id);
-        saveAccess();
-
-        return message.reply("Access granted ✅");
-    }
-
-    /* DISCORD LOOKUP */
+    /* DISCORD INTEL */
 
     if (command === "dlookup") {
 
@@ -136,19 +152,17 @@ client.on("messageCreate", async message => {
 
             const member = message.guild?.members.cache.get(user.id);
 
-            const flags = user.flags?.toArray()?.join(", ") || "None";
-
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD INTEL REPORT")
+                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
                 .setColor("DarkRed")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: "Username", value: user.tag, inline: true },
                     { name: "User ID", value: user.id, inline: true },
                     { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
-                    { name: "Badges", value: flags },
-                    { name: "Created", value: moment(user.createdAt).format("LLLL") },
-                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
+                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
+                    { name: "Flags", value: user.flags?.toArray().join(", ") || "None" }
                 );
 
             return message.reply({ embeds: [embed] });
@@ -158,7 +172,7 @@ client.on("messageCreate", async message => {
         }
     }
 
-    /* ROBLOX LOOKUP */
+    /* ROBLOX INTEL */
 
     if (command === "rlookup") {
 
@@ -185,7 +199,7 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX INTEL REPORT")
+                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
