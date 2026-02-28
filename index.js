@@ -4,28 +4,34 @@ const {
     EmbedBuilder,
     Partials
 } = require("discord.js");
+
 const axios = require("axios");
 const fs = require("fs");
-const whois = require("whois-json");
+const whois = require("whois");
+const geoip = require("geoip-lite");
+const moment = require("moment");
+const dns = require("dns");
+const util = require("util");
 
-// ==========================
-// CONFIG
-// ==========================
+const dnsLookup = util.promisify(dns.lookup);
+const dnsResolve = util.promisify(dns.resolve);
 
-const TOKEN = process.env.BOT_TOKEN; // SET IN HOSTING PANEL
+const whoisLookup = util.promisify(whois.lookup);
+
+// ================= CONFIG =================
+
+const TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = "924501682619052042";
 const LOG_CHANNEL_ID = "1475519152616898670";
 
+const PREFIX = "*";
+
 if (!TOKEN) {
-    console.error("BOT_TOKEN environment variable is missing.");
+    console.error("BOT_TOKEN missing");
     process.exit(1);
 }
 
-const PREFIX = "*";
-
-// ==========================
-// CLIENT SETUP
-// ==========================
+// ================= CLIENT =================
 
 const client = new Client({
     intents: [
@@ -37,16 +43,13 @@ const client = new Client({
     partials: [Partials.Channel]
 });
 
-// ==========================
-// PERSISTENT ACCESS STORAGE
-// ==========================
+// ================= ACCESS SYSTEM =================
 
 const ACCESS_FILE = "./access.json";
 let accessList = new Set([OWNER_ID]);
 
 if (fs.existsSync(ACCESS_FILE)) {
-    const data = JSON.parse(fs.readFileSync(ACCESS_FILE));
-    accessList = new Set(data);
+    accessList = new Set(JSON.parse(fs.readFileSync(ACCESS_FILE)));
 }
 
 function saveAccess() {
@@ -57,18 +60,17 @@ function hasAccess(id) {
     return accessList.has(id);
 }
 
-// ==========================
-// LOGGING SYSTEM
-// ==========================
+// ================= LOGGING =================
 
 async function logAction(text) {
+
     if (!LOG_CHANNEL_ID) return;
 
     const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
     if (!channel) return;
 
     const embed = new EmbedBuilder()
-        .setTitle("INTELLIGENCE AUDIT LOG")
+        .setTitle("INTELLIGENCE LOG")
         .setColor("DarkGold")
         .setDescription(text)
         .setTimestamp();
@@ -76,19 +78,15 @@ async function logAction(text) {
     channel.send({ embeds: [embed] }).catch(() => {});
 }
 
-// ==========================
-// READY
-// ==========================
+// ================= READY =================
 
 client.once("ready", () => {
     console.log(`OSINT Suite Online: ${client.user.tag}`);
 });
 
-// ==========================
-// COMMAND HANDLER
-// ==========================
+// ================= COMMANDS =================
 
-client.on("messageCreate", async (message) => {
+client.on("messageCreate", async message => {
 
     if (message.author.bot) return;
     if (!message.content.startsWith(PREFIX)) return;
@@ -96,8 +94,10 @@ client.on("messageCreate", async (message) => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // OWNER COMMANDS
+    // ================= GRANT =================
+
     if (command === "grant") {
+
         if (message.author.id !== OWNER_ID)
             return message.reply("Owner only.");
 
@@ -107,33 +107,15 @@ client.on("messageCreate", async (message) => {
         accessList.add(user.id);
         saveAccess();
 
-        await logAction(`Access GRANTED to ${user.tag}`);
-        return message.reply(`Access granted to ${user.tag}`);
+        return message.reply("Access granted.");
     }
 
-    if (command === "revoke") {
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
+    // ================= ACCESS CHECK =================
 
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
-
-        accessList.delete(user.id);
-        saveAccess();
-
-        await logAction(`Access REVOKED from ${user.tag}`);
-        return message.reply(`Access revoked from ${user.tag}`);
-    }
-
-    // ACCESS CHECK
-    if (!hasAccess(message.author.id)) {
-        await logAction(`Unauthorized attempt by ${message.author.tag}`);
+    if (!hasAccess(message.author.id))
         return message.reply("Access Denied.");
-    }
 
-    // =====================
-    // DISCORD LOOKUP
-    // =====================
+    // ================= DISCORD LOOKUP =================
 
     if (command === "dlookup") {
 
@@ -150,30 +132,28 @@ client.on("messageCreate", async (message) => {
         }
 
         const embed = new EmbedBuilder()
-            .setTitle("DISCORD INTELLIGENCE REPORT")
+            .setTitle("🧠 DISCORD INTELLIGENCE DOSSIER")
             .setColor("DarkRed")
             .setThumbnail(user.displayAvatarURL({ dynamic: true }))
             .addFields(
                 { name: "Username", value: user.tag, inline: true },
                 { name: "User ID", value: user.id, inline: true },
                 { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
-                { name: "Created", value: `<t:${parseInt(user.createdTimestamp / 1000)}:R>` }
+                { name: "Created", value: moment(user.createdAt).format("LLLL") }
             )
             .setTimestamp();
 
-        await logAction(`Discord lookup: ${user.tag}`);
         return message.reply({ embeds: [embed] });
     }
 
-    // =====================
-    // ROBLOX LOOKUP
-    // =====================
+    // ================= ROBLOX LOOKUP =================
 
     if (command === "rlookup") {
 
         if (!args[0]) return message.reply("Provide username.");
 
         try {
+
             const userRes = await axios.post(
                 "https://users.roblox.com/v1/usernames/users",
                 { usernames: [args[0]] }
@@ -187,54 +167,45 @@ client.on("messageCreate", async (message) => {
             );
 
             const avatarRes = await axios.get(
-                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png&isCircular=false`
+                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png`
             );
 
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("ROBLOX INTELLIGENCE REPORT")
+                .setTitle("🎮 ROBLOX INTELLIGENCE DOSSIER")
                 .setColor("DarkBlue")
                 .setThumbnail(avatar)
                 .addFields(
                     { name: "Username", value: infoRes.data.name, inline: true },
                     { name: "Display Name", value: infoRes.data.displayName, inline: true },
                     { name: "User ID", value: robloxUser.id.toString(), inline: true },
-                    { name: "Bio", value: infoRes.data.description || "No bio." }
+                    { name: "Bio", value: infoRes.data.description || "No bio" }
                 )
                 .setTimestamp();
 
-            await logAction(`Roblox lookup: ${infoRes.data.name}`);
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Lookup failed.");
+            return message.reply("Roblox lookup failed.");
         }
     }
 
-    // =====================
-    // WHOIS
-    // =====================
+    // ================= WHOIS =================
 
     if (command === "whois") {
 
         if (!args[0]) return message.reply("Provide domain.");
 
         try {
-            const result = await whois(args[0]);
+
+            const result = await whoisLookup(args[0]);
 
             const embed = new EmbedBuilder()
-                .setTitle("DOMAIN INTELLIGENCE REPORT")
+                .setTitle("🌐 DOMAIN INTELLIGENCE")
                 .setColor("DarkGreen")
-                .addFields(
-                    { name: "Domain", value: args[0] },
-                    { name: "Registrar", value: result.registrar || "Unknown" },
-                    { name: "Creation Date", value: result.creationDate || "Unknown" },
-                    { name: "Expiry Date", value: result.registryExpiryDate || "Unknown" }
-                )
-                .setTimestamp();
+                .setDescription("```\n" + result + "\n```");
 
-            await logAction(`WHOIS lookup: ${args[0]}`);
             return message.reply({ embeds: [embed] });
 
         } catch {
@@ -242,19 +213,42 @@ client.on("messageCreate", async (message) => {
         }
     }
 
-    // HELP
-    if (command === "help") {
+    // ================= IP =================
+
+    if (command === "ip") {
+
+        if (!args[0]) return message.reply("Provide IP.");
+
+        const geo = geoip.lookup(args[0]);
+
+        if (!geo) return message.reply("No data found.");
+
         const embed = new EmbedBuilder()
-            .setTitle("ELITE INTELLIGENCE PANEL")
+            .setTitle("🌍 IP INTELLIGENCE REPORT")
+            .setColor("DarkGreen")
+            .addFields(
+                { name: "Country", value: geo.country || "Unknown" },
+                { name: "City", value: geo.city || "Unknown" },
+                { name: "Region", value: geo.region || "Unknown" },
+                { name: "Timezone", value: geo.timezone || "Unknown" }
+            );
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    // ================= HELP =================
+
+    if (command === "help") {
+
+        const embed = new EmbedBuilder()
+            .setTitle("INTELLIGENCE COMMANDS")
             .setColor("DarkPurple")
             .addFields(
-                { name: "*dlookup <id/@>", value: "Discord scan" },
-                { name: "*rlookup <username>", value: "Roblox scan" },
-                { name: "*whois <domain>", value: "Domain lookup" },
-                { name: "*grant @user", value: "Grant access (Owner)" },
-                { name: "*revoke @user", value: "Revoke access (Owner)" }
-            )
-            .setTimestamp();
+                { name: "*dlookup", value: "Discord scan" },
+                { name: "*rlookup", value: "Roblox scan" },
+                { name: "*whois", value: "Domain scan" },
+                { name: "*ip", value: "IP scan" }
+            );
 
         return message.reply({ embeds: [embed] });
     }
