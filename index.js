@@ -8,20 +8,19 @@ const {
 const axios = require("axios");
 const moment = require("moment");
 const http = require("http");
+const fs = require("fs");
 
 const TOKEN = process.env.TOKEN;
 const PREFIX = "*";
+const OWNER_ID = "924501682619052042";
 
-/* Railway / Hosting Keep Alive */
+/* Keep Alive (Railway) */
 http.createServer((req, res) => {
-    res.write("Bot Alive");
+    res.write("Alive");
     res.end();
 }).listen(process.env.PORT || 3000);
 
-if (!TOKEN) {
-    console.log("TOKEN missing");
-    process.exit(1);
-}
+/* Client */
 
 const client = new Client({
     intents: [
@@ -31,23 +30,41 @@ const client = new Client({
         GatewayIntentBits.DirectMessages,
         GatewayIntentBits.GuildMembers
     ],
-    partials: [
-        Partials.Channel,
-        Partials.Message,
-        Partials.User
-    ]
+    partials: [Partials.Channel, Partials.User, Partials.Message]
 });
+
+/* Access System */
+
+const ACCESS_FILE = "./access.json";
+
+let accessList = new Set([OWNER_ID]);
+
+if (fs.existsSync(ACCESS_FILE)) {
+    try {
+        accessList = new Set(JSON.parse(fs.readFileSync(ACCESS_FILE)));
+    } catch {}
+}
+
+function saveAccess() {
+    fs.writeFileSync(ACCESS_FILE, JSON.stringify([...accessList]));
+}
+
+function hasAccess(id) {
+    return accessList.has(id);
+}
+
+/* Ready */
 
 client.on("ready", () => {
     console.log(`Online → ${client.user.tag}`);
 });
 
-/* ================= COMMANDS ================= */
+/* Commands */
 
 client.on("messageCreate", async message => {
 
-    if (message.author.bot) return;
     if (!message.content.startsWith(PREFIX)) return;
+    if (message.author.bot) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
@@ -57,14 +74,48 @@ client.on("messageCreate", async message => {
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🧠 BOT COMMANDS")
+            .setTitle("🧠 OSINT INTELLIGENCE SYSTEM")
             .setColor("Purple")
             .addFields(
-                { name: "*dlookup @user", value: "Discord public profile" },
-                { name: "*rlookup username", value: "Roblox public profile" }
+                { name: "*dlookup", value: "Discord public profile intel" },
+                { name: "*rlookup", value: "Roblox public profile intel" },
+                { name: "*osint", value: "OSINT tool menu" }
             );
 
         return message.reply({ embeds: [embed] });
+    }
+
+    /* OSINT TOOLS */
+
+    if (command === "osint") {
+
+        const embed = new EmbedBuilder()
+            .setTitle("🌐 OSINT TOOLKIT")
+            .setColor("Gold")
+            .addFields(
+                { name: "Discord Lookup", value: "https://discordhub.com/user/search" },
+                { name: "Roblox Lookup", value: "https://www.roblox.com/search/users" },
+                { name: "Username Search", value: "https://namechk.com" },
+                { name: "Email Search", value: "https://epieos.com" }
+            );
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    /* GRANT */
+
+    if (command === "grant") {
+
+        if (message.author.id !== OWNER_ID)
+            return message.reply("Owner only.");
+
+        const user = message.mentions.users.first();
+        if (!user) return message.reply("Mention user.");
+
+        accessList.add(user.id);
+        saveAccess();
+
+        return message.reply("Access granted ✅");
     }
 
     /* DISCORD LOOKUP */
@@ -80,26 +131,30 @@ client.on("messageCreate", async message => {
             } else if (args[0]) {
                 user = await client.users.fetch(args[0]);
             } else {
-                return message.reply("Provide user mention or ID.");
+                return message.reply("Provide user.");
             }
 
             const member = message.guild?.members.cache.get(user.id);
 
+            const flags = user.flags?.toArray()?.join(", ") || "None";
+
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD PUBLIC PROFILE")
+                .setTitle("🧠 DISCORD INTEL REPORT")
                 .setColor("DarkRed")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: "Username", value: user.tag, inline: true },
                     { name: "User ID", value: user.id, inline: true },
-                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
+                    { name: "Badges", value: flags },
+                    { name: "Created", value: moment(user.createdAt).format("LLLL") },
                     { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
                 );
 
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Lookup failed.");
+            return message.reply("Discord lookup failed.");
         }
     }
 
@@ -130,13 +185,13 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX PUBLIC PROFILE")
+                .setTitle("🎮 ROBLOX INTEL REPORT")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
-                    { name: "Username", value: infoRes.data.name, inline: true },
-                    { name: "Display Name", value: infoRes.data.displayName, inline: true },
-                    { name: "User ID", value: robloxUser.id.toString(), inline: true },
+                    { name: "Username", value: infoRes.data.name },
+                    { name: "Display Name", value: infoRes.data.displayName },
+                    { name: "User ID", value: robloxUser.id.toString() },
                     { name: "Bio", value: infoRes.data.description || "No bio" },
                     { name: "Created", value: moment(infoRes.data.created).format("LLLL") }
                 );
