@@ -1,305 +1,285 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  EmbedBuilder,
+  PermissionFlagsBits
+} = require("discord.js");
+
 const axios = require("axios");
 const dns = require("dns").promises;
-const fs = require("fs");
+const whois = require("whois");
 const crypto = require("crypto");
 
 const TOKEN = process.env.TOKEN;
 const OWNER_ID = "924501682619052042";
-const PREFIX = "!";
+const LOG_CHANNEL_ID = "1415589072201584642";
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+  intents: [GatewayIntentBits.Guilds]
 });
 
-/* ================= ACCESS SYSTEM ================= */
+/* ===============================
+   CLEARANCE SYSTEM
+================================= */
 
-let accessList = [];
+const clearance = {
+  owner: new Set([OWNER_ID]),
+  tier1: new Set(),
+  tier2: new Set()
+};
 
-if (fs.existsSync("access.json")) {
-  accessList = JSON.parse(fs.readFileSync("access.json"));
+function getClearance(id) {
+  if (clearance.owner.has(id)) return "OWNER";
+  if (clearance.tier2.has(id)) return "TIER2";
+  if (clearance.tier1.has(id)) return "TIER1";
+  return "NONE";
 }
 
-function saveAccess() {
-  fs.writeFileSync("access.json", JSON.stringify(accessList, null, 2));
+function requireAccess(interaction, level = "TIER1") {
+  const userLevel = getClearance(interaction.user.id);
+
+  if (userLevel === "OWNER") return true;
+  if (level === "TIER2" && userLevel === "TIER2") return true;
+  if (level === "TIER1" && (userLevel === "TIER1" || userLevel === "TIER2")) return true;
+
+  return false;
 }
 
-function hasAccess(id) {
-  return id === OWNER_ID || accessList.includes(id);
+/* ===============================
+   THREAT SCORING
+================================= */
+
+function riskScore(flags) {
+  let score = 0;
+  if (flags.newAccount) score += 30;
+  if (flags.noAvatar) score += 15;
+  if (flags.lowData) score += 20;
+  return Math.min(score, 100);
 }
 
-function formatDate(date) {
-  const d = new Date(date);
-  return {
-    day: d.toDateString(),
-    time: d.toLocaleTimeString()
-  };
-}
+/* ===============================
+   SLASH COMMAND REGISTRATION
+================================= */
 
-client.once("ready", () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+const commands = [
+  new SlashCommandBuilder()
+    .setName("discord")
+    .setDescription("Discord account intelligence")
+    .addUserOption(o => o.setName("user").setDescription("Target user").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("roblox")
+    .setDescription("Roblox intelligence")
+    .addStringOption(o => o.setName("username").setDescription("Roblox username").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("ip")
+    .setDescription("IP intelligence")
+    .addStringOption(o => o.setName("address").setDescription("IP address").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("email")
+    .setDescription("Email intelligence")
+    .addStringOption(o => o.setName("address").setDescription("Email").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("domain")
+    .setDescription("Domain WHOIS")
+    .addStringOption(o => o.setName("name").setDescription("Domain").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("hash")
+    .setDescription("SHA256 hash")
+    .addStringOption(o => o.setName("text").setDescription("Text").setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName("base64")
+    .setDescription("Encode or decode base64")
+    .addStringOption(o =>
+      o.setName("mode")
+        .setDescription("encode or decode")
+        .setRequired(true)
+        .addChoices(
+          { name: "encode", value: "encode" },
+          { name: "decode", value: "decode" }
+        )
+    )
+    .addStringOption(o => o.setName("text").setDescription("Text").setRequired(true))
+].map(cmd => cmd.toJSON());
+
+client.once("ready", async () => {
+  console.log(`Logged in as ${client.user.tag}`);
+
+  const rest = new REST({ version: "10" }).setToken(TOKEN);
+  await rest.put(
+    Routes.applicationCommands(client.user.id),
+    { body: commands }
+  );
+
+  console.log("Slash commands registered globally.");
 });
 
-/* ================= MAIN HANDLER ================= */
+/* ===============================
+   INTERACTION HANDLER
+================================= */
 
-client.on("messageCreate", async (message) => {
-  if (!message.content.startsWith(PREFIX) || message.author.bot) return;
+client.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand()) return;
 
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-
-  /* ===== ACCESS CONTROL ===== */
-
-  if (command === "access") {
-    if (message.author.id !== OWNER_ID)
-      return message.reply("Owner only command.");
-
-    const action = args[0];
-    const id = args[1];
-
-    if (!action) return message.reply("Usage: !access add/remove/list <id>");
-
-    if (action === "add") {
-      if (!id) return message.reply("Provide user ID.");
-      if (!accessList.includes(id)) {
-        accessList.push(id);
-        saveAccess();
-        return message.reply(`✅ Access granted to ${id}`);
-      }
-    }
-
-    if (action === "remove") {
-      accessList = accessList.filter(u => u !== id);
-      saveAccess();
-      return message.reply(`❌ Access removed from ${id}`);
-    }
-
-    if (action === "list") {
-      return message.reply(
-        accessList.length
-          ? `🔐 Access List:\n${accessList.join("\n")}`
-          : "No users authorized."
-      );
-    }
+  if (!requireAccess(interaction, "TIER1")) {
+    return interaction.reply({
+      content: "🚫 Access denied.",
+      ephemeral: true
+    });
   }
 
-  if (!hasAccess(message.author.id))
-    return message.reply("⛔ You are not authorized to use this bot.");
+  await interaction.deferReply({ ephemeral: true });
 
-  /* ================= HELP ================= */
+  const cmd = interaction.commandName;
 
-  if (command === "help") {
+/* ===============================
+   DISCORD
+================================= */
+
+  if (cmd === "discord") {
+    const user = interaction.options.getUser("user");
+    const created = `<t:${Math.floor(user.createdTimestamp / 1000)}:F>`;
+    const ageDays = (Date.now() - user.createdTimestamp) / 86400000;
+
+    const score = riskScore({
+      newAccount: ageDays < 30,
+      noAvatar: !user.avatar
+    });
+
     const embed = new EmbedBuilder()
-      .setColor("DarkPurple")
-      .setTitle("🧠 Intelligence Bot Commands")
+      .setTitle("Discord Intelligence")
+      .setThumbnail(user.displayAvatarURL())
       .addFields(
-        { name: "🔐 Access", value: "`!access add/remove/list <id>`" },
-        { name: "🟥 Discord", value: "`!discorduser <@user/id>`\n`!altscan <@user>`" },
-        { name: "🟦 Roblox", value: "`!rbxuser <username>`" },
-        { name: "🟨 Email", value: "`!email <email>`" },
-        { name: "🟩 IP", value: "`!ip <ip>`" },
-        { name: "🟪 Hash", value: "`!hash <text>`" }
+        { name: "Tag", value: user.tag },
+        { name: "ID", value: user.id },
+        { name: "Created", value: created },
+        { name: "Risk Score", value: `${score}/100` }
       )
-      .setFooter({ text: "Public API Data Only • Legal OSINT" });
+      .setColor("Blue");
 
-    return message.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
-  /* ================= DISCORD USER ================= */
+/* ===============================
+   ROBLOX
+================================= */
 
-  if (command === "discorduser") {
-    const user =
-      message.mentions.users.first() ||
-      (await client.users.fetch(args[0]).catch(() => null));
+  if (cmd === "roblox") {
+    const username = interaction.options.getString("username");
 
-    if (!user) return message.reply("User not found.");
+    const res = await axios.post(
+      "https://users.roblox.com/v1/usernames/users",
+      { usernames: [username] }
+    );
 
-    const created = formatDate(user.createdAt);
+    const user = res.data.data[0];
+    if (!user) return interaction.editReply("User not found.");
 
     const embed = new EmbedBuilder()
-      .setColor("Red")
-      .setTitle("Discord Intelligence Report")
-      .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+      .setTitle("Roblox Intelligence")
       .addFields(
-        { name: "Username", value: user.tag, inline: true },
-        { name: "User ID", value: user.id, inline: true },
-        { name: "Bot Account", value: user.bot ? "Yes" : "No", inline: true },
-        { name: "Created Date", value: created.day, inline: true },
-        { name: "Created Time", value: created.time, inline: true }
-      );
+        { name: "Username", value: user.name },
+        { name: "User ID", value: user.id.toString() }
+      )
+      .setColor("Red");
 
-    return message.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
-  /* ================= DISCORD ALT SCAN ================= */
+/* ===============================
+   IP
+================================= */
 
-  if (command === "altscan") {
-    const user = message.mentions.users.first() || message.author;
+  if (cmd === "ip") {
+    const ip = interaction.options.getString("address");
 
-    let score = 0;
-    const ageDays = (Date.now() - user.createdAt) / (1000 * 60 * 60 * 24);
-
-    if (ageDays < 30) score += 40;
-    if (!user.avatar) score += 20;
-    if (user.username.match(/\d{4,}/)) score += 20;
-
-    let risk = "Low";
-    if (score > 60) risk = "High";
-    else if (score > 30) risk = "Medium";
+    const res = await axios.get(`http://ip-api.com/json/${ip}`);
+    const d = res.data;
 
     const embed = new EmbedBuilder()
-      .setColor("Orange")
-      .setTitle("Discord Alt Risk Analysis")
+      .setTitle("IP Intelligence")
       .addFields(
-        { name: "Account Age (days)", value: ageDays.toFixed(1), inline: true },
-        { name: "Risk Score", value: `${score}/100`, inline: true },
-        { name: "Risk Level", value: risk, inline: true }
-      );
+        { name: "Country", value: d.country || "N/A" },
+        { name: "ISP", value: d.isp || "N/A" },
+        { name: "ASN", value: d.as || "N/A" }
+      )
+      .setColor("Purple");
 
-    return message.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
-  /* ================= ROBLOX USER ================= */
+/* ===============================
+   EMAIL
+================================= */
 
-  if (command === "rbxuser") {
-    const username = args[0];
-    if (!username) return message.reply("Provide Roblox username.");
-
-    try {
-      const userRes = await axios.post(
-        "https://users.roblox.com/v1/usernames/users",
-        { usernames: [username], excludeBannedUsers: false }
-      );
-
-      if (!userRes.data.data.length)
-        return message.reply("Roblox user not found.");
-
-      const userId = userRes.data.data[0].id;
-
-      const profile = await axios.get(
-        `https://users.roblox.com/v1/users/${userId}`
-      );
-
-      const avatar = await axios.get(
-        `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=420x420&format=Png&isCircular=false`
-      );
-
-      const friends = await axios.get(
-        `https://friends.roblox.com/v1/users/${userId}/friends/count`
-      );
-
-      const followers = await axios.get(
-        `https://friends.roblox.com/v1/users/${userId}/followers/count`
-      );
-
-      const following = await axios.get(
-        `https://friends.roblox.com/v1/users/${userId}/followings/count`
-      );
-
-      const groups = await axios.get(
-        `https://groups.roblox.com/v2/users/${userId}/groups/roles`
-      );
-
-      const created = formatDate(profile.data.created);
-
-      const embed = new EmbedBuilder()
-        .setColor("Blue")
-        .setTitle("Roblox Intelligence Report")
-        .setThumbnail(avatar.data.data[0].imageUrl)
-        .addFields(
-          { name: "Username", value: profile.data.name, inline: true },
-          { name: "Display Name", value: profile.data.displayName, inline: true },
-          { name: "User ID", value: userId.toString(), inline: true },
-          { name: "Banned", value: profile.data.isBanned ? "Yes" : "No", inline: true },
-          { name: "Friends", value: friends.data.count.toString(), inline: true },
-          { name: "Followers", value: followers.data.count.toString(), inline: true },
-          { name: "Following", value: following.data.count.toString(), inline: true },
-          { name: "Groups", value: groups.data.data.length.toString(), inline: true },
-          { name: "Created Date", value: created.day, inline: true },
-          { name: "Created Time", value: created.time, inline: true }
-        );
-
-      return message.reply({ embeds: [embed] });
-
-    } catch {
-      return message.reply("Error fetching Roblox data.");
-    }
-  }
-
-  /* ================= EMAIL ================= */
-
-  if (command === "email") {
-    const email = args[0];
-    if (!email) return message.reply("Provide email.");
-
+  if (cmd === "email") {
+    const email = interaction.options.getString("address");
     const domain = email.split("@")[1];
-    if (!domain) return message.reply("Invalid email.");
 
-    const mx = await dns.resolveMx(domain).catch(() => null);
+    const mx = await dns.resolveMx(domain);
 
     const embed = new EmbedBuilder()
-      .setColor("Yellow")
       .setTitle("Email Intelligence")
       .addFields(
-        { name: "Email", value: email },
         { name: "Domain", value: domain },
-        {
-          name: "MX Records",
-          value: mx ? mx.map(m => m.exchange).join("\n") : "None Found"
-        }
-      );
+        { name: "MX Records", value: mx.length.toString() }
+      )
+      .setColor("Orange");
 
-    return message.reply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
   }
 
-  /* ================= IP ================= */
+/* ===============================
+   DOMAIN
+================================= */
 
-  if (command === "ip") {
-    const ip = args[0];
-    if (!ip) return message.reply("Provide IP.");
+  if (cmd === "domain") {
+    const domain = interaction.options.getString("name");
 
-    try {
-      const res = await axios.get(`http://ip-api.com/json/${ip}`);
-      const data = res.data;
+    whois.lookup(domain, (err, data) => {
+      if (err) return interaction.editReply("WHOIS failed.");
 
-      const embed = new EmbedBuilder()
-        .setColor("Green")
-        .setTitle("IP Intelligence")
-        .addFields(
-          { name: "Country", value: data.country || "N/A", inline: true },
-          { name: "City", value: data.city || "N/A", inline: true },
-          { name: "ISP", value: data.isp || "N/A", inline: true },
-          { name: "Timezone", value: data.timezone || "N/A", inline: true }
-        );
-
-      return message.reply({ embeds: [embed] });
-
-    } catch {
-      return message.reply("Invalid IP or lookup failed.");
-    }
+      interaction.editReply("```" + data.substring(0, 1900) + "```");
+    });
   }
 
-  /* ================= HASH ================= */
+/* ===============================
+   HASH
+================================= */
 
-  if (command === "hash") {
-    const text = args.join(" ");
-    if (!text) return message.reply("Provide text.");
+  if (cmd === "hash") {
+    const text = interaction.options.getString("text");
+    const hash = crypto.createHash("sha256").update(text).digest("hex");
+    return interaction.editReply(hash);
+  }
 
-    const embed = new EmbedBuilder()
-      .setColor("Purple")
-      .setTitle("Hash Generator")
-      .addFields(
-        { name: "MD5", value: crypto.createHash("md5").update(text).digest("hex") },
-        { name: "SHA256", value: crypto.createHash("sha256").update(text).digest("hex") }
-      );
+/* ===============================
+   BASE64
+================================= */
 
-    return message.reply({ embeds: [embed] });
+  if (cmd === "base64") {
+    const mode = interaction.options.getString("mode");
+    const text = interaction.options.getString("text");
+
+    if (mode === "encode")
+      return interaction.editReply(Buffer.from(text).toString("base64"));
+
+    if (mode === "decode")
+      return interaction.editReply(Buffer.from(text, "base64").toString("utf8"));
   }
 
 });
+
+/* ===============================
+   LOGIN
+================================= */
 
 client.login(TOKEN);
