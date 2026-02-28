@@ -7,7 +7,6 @@ const {
 
 const axios = require("axios");
 const fs = require("fs");
-const whois = require("whois-json");
 const geoip = require("geoip-lite");
 const moment = require("moment");
 
@@ -78,7 +77,7 @@ client.once("ready", () => {
     console.log(`OSINT Suite Online: ${client.user.tag}`);
 });
 
-// ================= COMMANDS =================
+// ================= COMMAND HANDLER =================
 
 client.on("messageCreate", async message => {
 
@@ -88,7 +87,7 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // OWNER ACCESS GRANT
+    // OWNER GRANT
 
     if (command === "grant") {
 
@@ -135,8 +134,6 @@ client.on("messageCreate", async message => {
             )
             .setTimestamp();
 
-        await logAction(`Discord scan: ${user.tag}`);
-
         return message.reply({ embeds: [embed] });
     }
 
@@ -178,8 +175,6 @@ client.on("messageCreate", async message => {
                 )
                 .setTimestamp();
 
-            await logAction(`Roblox scan: ${infoRes.data.name}`);
-
             return message.reply({ embeds: [embed] });
 
         } catch {
@@ -187,35 +182,7 @@ client.on("messageCreate", async message => {
         }
     }
 
-    // ================= WHOIS =================
-
-    if (command === "whois") {
-
-        if (!args[0]) return message.reply("Provide domain.");
-
-        try {
-
-            const result = await whois(args[0]);
-
-            const embed = new EmbedBuilder()
-                .setTitle("🌐 DOMAIN INTELLIGENCE DOSSIER")
-                .setColor("DarkGreen")
-                .addFields(
-                    { name: "Domain", value: args[0] },
-                    { name: "Registrar", value: result.registrar || "Unknown" },
-                    { name: "Created", value: result.creationDate || "Unknown" },
-                    { name: "Expiry", value: result.registryExpiryDate || "Unknown" }
-                )
-                .setTimestamp();
-
-            return message.reply({ embeds: [embed] });
-
-        } catch {
-            return message.reply("WHOIS failed.");
-        }
-    }
-
-    // ================= IP =================
+    // ================= IP LOOKUP =================
 
     if (command === "ip") {
 
@@ -248,8 +215,8 @@ client.on("messageCreate", async message => {
             .addFields(
                 { name: "*dlookup", value: "Discord scan" },
                 { name: "*rlookup", value: "Roblox scan" },
-                { name: "*whois", value: "Domain scan" },
-                { name: "*ip", value: "IP scan" }
+                { name: "*ip", value: "IP scan" },
+                { name: "*grant", value: "Owner access" }
             );
 
         return message.reply({ embeds: [embed] });
