@@ -12,16 +12,17 @@ const http = require("http");
 
 const TOKEN = process.env.TOKEN;
 const PREFIX = "!";
+
 const OWNER_ID = "924501682619052042";
 
-/* Keep Alive */
+/* KEEP ALIVE (Railway) */
 
 http.createServer((req, res) => {
     res.write("Alive");
     res.end();
 }).listen(process.env.PORT || 3000);
 
-/* Client */
+/* CLIENT */
 
 const client = new Client({
     intents: [
@@ -34,7 +35,7 @@ const client = new Client({
     partials: [Partials.Channel, Partials.User, Partials.Message]
 });
 
-/* Access System */
+/* ACCESS SYSTEM */
 
 const ACCESS_FILE = "./access.json";
 
@@ -54,23 +55,23 @@ function hasAccess(id) {
     return accessList.has(id);
 }
 
-/* Ready */
+/* READY */
 
 client.on("ready", () => {
-    console.log(`😈 ULTRA NIGHTMARE ONLINE → ${client.user.tag}`);
+    console.log(`Online → ${client.user.tag}`);
 });
 
-/* Commands */
+/* COMMANDS */
 
 client.on("messageCreate", async message => {
 
-    if (!message.content.startsWith(PREFIX)) return;
     if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    /* GRANT TEAM ACCESS */
+    /* GRANT */
 
     if (command === "grant") {
 
@@ -83,10 +84,10 @@ client.on("messageCreate", async message => {
         accessList.add(user.id);
         saveAccess();
 
-        return message.reply("😈 Team access granted.");
+        return message.reply("Team access granted ✅");
     }
 
-    /* REVOKE ACCESS */
+    /* REVOKE */
 
     if (command === "revoke") {
 
@@ -99,7 +100,7 @@ client.on("messageCreate", async message => {
         accessList.delete(user.id);
         saveAccess();
 
-        return message.reply("Access revoked.");
+        return message.reply("Team access revoked ❌");
     }
 
     if (!hasAccess(message.author.id))
@@ -110,18 +111,91 @@ client.on("messageCreate", async message => {
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("😈 ULTRA NIGHTMARE INTEL SYSTEM")
-            .setColor("Red")
+            .setTitle("😈 INTELLIGENCE BOT COMMANDS")
+            .setColor("Purple")
             .setDescription(`
-Commands:
-
-!dlookup → Discord intelligence report  
-!rlookup → Roblox intelligence report  
-!osint → OSINT tools gateway  
-!ip → IP geolocation lookup  
-!grant → Add team member  
-!revoke → Remove team member
+!dlookup @user / id → Discord intelligence report
+!rlookup username / id → Roblox intelligence report
+!userinfo → User profile info
+!serverinfo → Server info
+!avatar → User avatar
+!banner → User banner
+!osint → OSINT tools
+!ip ipaddress → IP geolocation
+!ping → Bot latency
+!grant @user → Give team access
+!revoke @user → Remove team access
 `);
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    /* PING */
+
+    if (command === "ping") {
+        return message.reply(`🏓 Pong! ${client.ws.ping}ms`);
+    }
+
+    /* AVATAR */
+
+    if (command === "avatar") {
+
+        let user = message.mentions.users.first()
+            || await client.users.fetch(args[0]).catch(() => message.author);
+
+        const embed = new EmbedBuilder()
+            .setTitle("🖼️ AVATAR")
+            .setImage(user.displayAvatarURL({ size: 1024 }))
+            .setColor("Blue");
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    /* USERINFO */
+
+    if (command === "userinfo") {
+
+        let user = message.mentions.users.first()
+            || await client.users.fetch(args[0]).catch(() => message.author);
+
+        const member = message.guild?.members.cache.get(user.id);
+
+        const embed = new EmbedBuilder()
+            .setTitle("👤 USER INTEL REPORT")
+            .setColor("Purple")
+            .setThumbnail(user.displayAvatarURL())
+            .addFields(
+                { name: "Username", value: user.tag },
+                { name: "User ID", value: user.id },
+                { name: "Bot", value: user.bot ? "Yes" : "No" },
+                { name: "Created", value: moment(user.createdAt).format("LLLL") }
+            );
+
+        if (member) {
+            embed.addFields({
+                name: "Server Joined",
+                value: moment(member.joinedAt).format("LLLL")
+            });
+        }
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    /* SERVERINFO */
+
+    if (command === "serverinfo") {
+
+        const guild = message.guild;
+
+        const embed = new EmbedBuilder()
+            .setTitle("🏰 SERVER INTEL REPORT")
+            .setColor("Gold")
+            .addFields(
+                { name: "Server Name", value: guild.name },
+                { name: "Members", value: guild.memberCount.toString() },
+                { name: "Owner ID", value: guild.ownerId },
+                { name: "Created", value: moment(guild.createdAt).format("LLLL") }
+            );
 
         return message.reply({ embeds: [embed] });
     }
@@ -135,8 +209,8 @@ Commands:
             .setColor("Gold")
             .addFields(
                 { name: "Username Search", value: "https://namechk.com" },
-                { name: "Email OSINT", value: "https://epieos.com" },
-                { name: "Social OSINT", value: "https://whatsmyname.app" }
+                { name: "Email Search", value: "https://epieos.com" },
+                { name: "Social Search", value: "https://whatsmyname.app" }
             );
 
         return message.reply({ embeds: [embed] });
@@ -159,16 +233,15 @@ Commands:
             const member = message.guild?.members.cache.get(user.id);
 
             const embed = new EmbedBuilder()
-                .setTitle("😈 DISCORD NIGHTMARE DOSSIER")
+                .setTitle("🧠 DISCORD DOSSIER")
                 .setColor("DarkRed")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: "Username", value: user.tag },
                     { name: "User ID", value: user.id },
-                    { name: "Bot", value: user.bot ? "Yes" : "No" },
                     { name: "Created", value: moment(user.createdAt).format("LLLL") },
                     { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
-                    { name: "Profile Link", value: `https://discord.com/users/${user.id}` }
+                    { name: "Profile", value: `https://discord.com/users/${user.id}` }
                 );
 
             return message.reply({ embeds: [embed] });
@@ -205,7 +278,7 @@ Commands:
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX NIGHTMARE DOSSIER")
+                .setTitle("🎮 ROBLOX DOSSIER")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
