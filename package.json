@@ -1,6 +1,6 @@
 {
-  "name": "intelligence-osint-bot",
-  "version": "3.0.0",
+  "name": "legendary-osint-bot",
+  "version": "4.0.0",
   "main": "index.js",
   "dependencies": {
     "discord.js": "^14.15.0",
