@@ -33,7 +33,7 @@ const client = new Client({
     partials: [Partials.Channel, Partials.User, Partials.Message]
 });
 
-/* Access System */
+/* Team Access */
 
 const ACCESS_FILE = "./access.json";
 
@@ -56,7 +56,7 @@ function hasAccess(id) {
 /* Ready */
 
 client.on("ready", () => {
-    console.log(`Legendary OSINT Online → ${client.user.tag}`);
+    console.log(`🔥 Final Boss OSINT Online → ${client.user.tag}`);
 });
 
 /* Commands */
@@ -69,10 +69,9 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    /* TEAM ACCESS */
+    /* TEAM SYSTEM */
 
     if (command === "grant") {
-
         if (message.author.id !== OWNER_ID)
             return message.reply("Owner only.");
 
@@ -86,7 +85,6 @@ client.on("messageCreate", async message => {
     }
 
     if (command === "revoke") {
-
         if (message.author.id !== OWNER_ID)
             return message.reply("Owner only.");
 
@@ -107,12 +105,14 @@ client.on("messageCreate", async message => {
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🧠 LEGENDARY OSINT SYSTEM")
+            .setTitle("🔥 FINAL BOSS INTELLIGENCE SYSTEM")
             .setColor("Purple")
             .addFields(
-                { name: "*dlookup", value: "Discord intelligence report" },
-                { name: "*rlookup", value: "Roblox intelligence report" },
-                { name: "*osint", value: "OSINT tool menu" }
+                { name: "*dlookup", value: "Discord intel report" },
+                { name: "*rlookup", value: "Roblox intel report" },
+                { name: "*osint", value: "OSINT tools" },
+                { name: "*email", value: "Email OSINT search" },
+                { name: "*usersearch", value: "Username OSINT search" }
             );
 
         return message.reply({ embeds: [embed] });
@@ -123,18 +123,19 @@ client.on("messageCreate", async message => {
     if (command === "osint") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🌐 OSINT TOOLKIT")
+            .setTitle("🌐 OSINT TOOL MENU")
             .setColor("Gold")
             .addFields(
-                { name: "Username Search", value: "https://namechk.com" },
+                { name: "Username OSINT", value: "https://namechk.com" },
                 { name: "Email OSINT", value: "https://epieos.com" },
-                { name: "Social Search", value: "https://whatsmyname.app" }
+                { name: "Social Search", value: "https://whatsmyname.app" },
+                { name: "Username Search", value: "https://instantusername.com" }
             );
 
         return message.reply({ embeds: [embed] });
     }
 
-    /* DISCORD INTEL */
+    /* DISCORD LOOKUP */
 
     if (command === "dlookup") {
 
@@ -153,26 +154,25 @@ client.on("messageCreate", async message => {
             const member = message.guild?.members.cache.get(user.id);
 
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
+                .setTitle("🧠 DISCORD BOSS REPORT")
                 .setColor("DarkRed")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
-                    { name: "Username", value: user.tag, inline: true },
-                    { name: "User ID", value: user.id, inline: true },
-                    { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
-                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
-                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
-                    { name: "Flags", value: user.flags?.toArray().join(", ") || "None" }
+                    { name: "Username", value: user.tag },
+                    { name: "User ID", value: user.id },
+                    { name: "Bot", value: user.bot ? "Yes" : "No" },
+                    { name: "Created", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
                 );
 
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Discord lookup failed.");
+            return message.reply("Lookup failed.");
         }
     }
 
-    /* ROBLOX INTEL */
+    /* ROBLOX LOOKUP */
 
     if (command === "rlookup") {
 
@@ -199,7 +199,7 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
+                .setTitle("🎮 ROBLOX BOSS REPORT")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
@@ -215,6 +215,38 @@ client.on("messageCreate", async message => {
         } catch {
             return message.reply("Roblox lookup failed.");
         }
+    }
+
+    /* EMAIL OSINT */
+
+    if (command === "email") {
+
+        if (!args[0]) return message.reply("Provide email.");
+
+        const embed = new EmbedBuilder()
+            .setTitle("📧 EMAIL OSINT")
+            .setColor("Green")
+            .addFields(
+                { name: "Search Email", value: `https://epieos.com/?q=${args[0]}` }
+            );
+
+        return message.reply({ embeds: [embed] });
+    }
+
+    /* USERNAME SEARCH */
+
+    if (command === "usersearch") {
+
+        if (!args[0]) return message.reply("Provide username.");
+
+        const embed = new EmbedBuilder()
+            .setTitle("👤 USERNAME OSINT")
+            .setColor("Orange")
+            .addFields(
+                { name: "Search Username", value: `https://whatsmyname.app/?q=${args[0]}` }
+            );
+
+        return message.reply({ embeds: [embed] });
     }
 
 });
