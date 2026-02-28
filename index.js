@@ -6,16 +6,17 @@ const {
 } = require("discord.js");
 
 const axios = require("axios");
-const fs = require("fs");
-const geoip = require("geoip-lite");
 const moment = require("moment");
+
+const fs = require("fs");
 
 // ================= CONFIG =================
 
 const TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = "924501682619052042";
-const LOG_CHANNEL_ID = "1475519152616898670";
 const PREFIX = "*";
+
+const LOG_CHANNEL_ID = "1475519152616898670";
 
 if (!TOKEN) {
     console.error("BOT_TOKEN missing");
@@ -37,6 +38,7 @@ const client = new Client({
 // ================= ACCESS SYSTEM =================
 
 const ACCESS_FILE = "./access.json";
+
 let accessList = new Set([OWNER_ID]);
 
 if (fs.existsSync(ACCESS_FILE)) {
@@ -53,28 +55,30 @@ function hasAccess(id) {
     return accessList.has(id);
 }
 
-// ================= LOGGING =================
+// ================= SAFE LOGGING =================
 
 async function logAction(text) {
 
     if (!LOG_CHANNEL_ID) return;
 
-    const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-    if (!channel) return;
+    try {
+        const channel = await client.channels.fetch(LOG_CHANNEL_ID);
+        if (!channel) return;
 
-    const embed = new EmbedBuilder()
-        .setTitle("INTELLIGENCE LOG")
-        .setColor("DarkGold")
-        .setDescription(text)
-        .setTimestamp();
+        const embed = new EmbedBuilder()
+            .setTitle("INTELLIGENCE LOG")
+            .setColor("Gold")
+            .setDescription(text)
+            .setTimestamp();
 
-    channel.send({ embeds: [embed] }).catch(() => {});
+        channel.send({ embeds: [embed] }).catch(() => {});
+    } catch {}
 }
 
 // ================= READY =================
 
 client.once("ready", () => {
-    console.log(`OSINT Suite Online: ${client.user.tag}`);
+    console.log(`OSINT Suite Online → ${client.user.tag}`);
 });
 
 // ================= COMMAND HANDLER =================
@@ -87,7 +91,7 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // OWNER GRANT
+    // OWNER ACCESS GRANT
 
     if (command === "grant") {
 
@@ -112,29 +116,33 @@ client.on("messageCreate", async message => {
 
         let user;
 
-        if (message.mentions.users.first()) {
-            user = message.mentions.users.first();
-        } else {
-            try {
+        try {
+
+            if (message.mentions.users.first()) {
+                user = message.mentions.users.first();
+            } else {
                 user = await client.users.fetch(args[0]);
-            } catch {
-                return message.reply("Invalid ID.");
             }
+
+            const embed = new EmbedBuilder()
+                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
+                .setColor("DarkRed")
+                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    { name: "Username", value: user.tag, inline: true },
+                    { name: "User ID", value: user.id, inline: true },
+                    { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
+                    { name: "Created", value: moment(user.createdAt).format("LLLL") }
+                )
+                .setTimestamp();
+
+            await logAction(`Discord scan → ${user.tag}`);
+
+            return message.reply({ embeds: [embed] });
+
+        } catch {
+            return message.reply("Lookup failed.");
         }
-
-        const embed = new EmbedBuilder()
-            .setTitle("🧠 DISCORD INTELLIGENCE DOSSIER")
-            .setColor("DarkRed")
-            .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: "Username", value: user.tag, inline: true },
-                { name: "User ID", value: user.id, inline: true },
-                { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
-                { name: "Created", value: moment(user.createdAt).format("LLLL") }
-            )
-            .setTimestamp();
-
-        return message.reply({ embeds: [embed] });
     }
 
     // ================= ROBLOX LOOKUP =================
@@ -164,8 +172,8 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX INTELLIGENCE DOSSIER")
-                .setColor("DarkBlue")
+                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
+                .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
                     { name: "Username", value: infoRes.data.name, inline: true },
@@ -175,34 +183,13 @@ client.on("messageCreate", async message => {
                 )
                 .setTimestamp();
 
+            await logAction(`Roblox scan → ${infoRes.data.name}`);
+
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Roblox scan failed.");
+            return message.reply("Roblox lookup failed.");
         }
-    }
-
-    // ================= IP LOOKUP =================
-
-    if (command === "ip") {
-
-        if (!args[0]) return message.reply("Provide IP.");
-
-        const geo = geoip.lookup(args[0]);
-
-        if (!geo) return message.reply("No data found.");
-
-        const embed = new EmbedBuilder()
-            .setTitle("🌍 IP INTELLIGENCE REPORT")
-            .setColor("DarkGreen")
-            .addFields(
-                { name: "Country", value: geo.country || "Unknown" },
-                { name: "City", value: geo.city || "Unknown" },
-                { name: "Region", value: geo.region || "Unknown" },
-                { name: "Timezone", value: geo.timezone || "Unknown" }
-            );
-
-        return message.reply({ embeds: [embed] });
     }
 
     // ================= HELP =================
@@ -211,11 +198,10 @@ client.on("messageCreate", async message => {
 
         const embed = new EmbedBuilder()
             .setTitle("INTELLIGENCE COMMANDS")
-            .setColor("DarkPurple")
+            .setColor("Purple")
             .addFields(
                 { name: "*dlookup", value: "Discord scan" },
                 { name: "*rlookup", value: "Roblox scan" },
-                { name: "*ip", value: "IP scan" },
                 { name: "*grant", value: "Owner access" }
             );
 
