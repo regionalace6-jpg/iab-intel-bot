@@ -10,14 +10,16 @@ const moment = require("moment");
 const http = require("http");
 
 const TOKEN = process.env.TOKEN;
-const PREFIX = "*";
+const PREFIX = "!";
 
-/* KEEP ALIVE */
+/* Railway Keep Alive */
 
 http.createServer((req, res) => {
     res.write("Alive");
     res.end();
 }).listen(process.env.PORT || 3000);
+
+/* Client */
 
 const client = new Client({
     intents: [
@@ -31,7 +33,7 @@ const client = new Client({
 });
 
 client.on("ready", () => {
-    console.log(`🔥 GOD INTEL ONLINE → ${client.user.tag}`);
+    console.log(`🔥 SUPER ELITE INTEL ONLINE → ${client.user.tag}`);
 });
 
 /* COMMANDS */
@@ -49,14 +51,33 @@ client.on("messageCreate", async message => {
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🔥 GOD INTELLIGENCE SYSTEM")
+            .setTitle("🔥 SUPER ELITE INTELLIGENCE BOT")
             .setColor("Purple")
-            .addFields(
-                { name: "*dlookup", value: "Discord Intelligence Report" },
-                { name: "*rlookup", value: "Roblox Intelligence Report" },
-                { name: "*osint", value: "OSINT Tools Menu" },
-                { name: "*ip", value: "IP Geolocation Lookup" }
-            );
+            .setDescription(`
+**Commands Explained**
+
+!help → Shows this menu  
+
+!dlookup @user / ID → Shows Discord public profile intelligence  
+Includes:
+• Username  
+• User ID  
+• Account creation time  
+• Server join time  
+• Avatar  
+
+!rlookup username / ID → Roblox public profile intelligence  
+Includes:
+• Username  
+• Display Name  
+• User ID  
+• Bio  
+• Creation time  
+
+!osint → Shows OSINT search tools  
+
+!ip ipaddress → Shows geolocation info
+`);
 
         return message.reply({ embeds: [embed] });
     }
@@ -66,7 +87,7 @@ client.on("messageCreate", async message => {
     if (command === "osint") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🌐 OSINT POWER TOOLS")
+            .setTitle("🌐 OSINT TOOL MENU")
             .setColor("Gold")
             .addFields(
                 { name: "Username Search", value: "https://namechk.com" },
@@ -77,7 +98,7 @@ client.on("messageCreate", async message => {
         return message.reply({ embeds: [embed] });
     }
 
-    /* DISCORD INTEL */
+    /* DISCORD LOOKUP */
 
     if (command === "dlookup") {
 
@@ -89,7 +110,9 @@ client.on("messageCreate", async message => {
                 user = message.mentions.users.first();
             } else if (args[0]) {
                 user = await client.users.fetch(args[0]);
-            } else return message.reply("Provide user.");
+            } else {
+                return message.reply("Mention user or provide ID.");
+            }
 
             const member = message.guild?.members.cache.get(user.id);
 
@@ -100,41 +123,46 @@ client.on("messageCreate", async message => {
                 .addFields(
                     { name: "Username", value: user.tag },
                     { name: "User ID", value: user.id },
-                    { name: "Bot", value: user.bot ? "Yes" : "No" },
-                    { name: "Created", value: moment(user.createdAt).format("LLLL") },
-                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
-                    { name: "Profile Link", value: `https://discord.com/users/${user.id}` }
+                    { name: "Bot Account", value: user.bot ? "Yes" : "No" },
+                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
                 );
 
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Lookup failed.");
+            return message.reply("Discord lookup failed.");
         }
     }
 
-    /* ROBLOX INTEL */
+    /* ROBLOX LOOKUP */
 
     if (command === "rlookup") {
 
-        if (!args[0]) return message.reply("Provide username.");
+        if (!args[0]) return message.reply("Provide Roblox username or ID.");
 
         try {
 
-            const userRes = await axios.post(
-                "https://users.roblox.com/v1/usernames/users",
-                { usernames: [args[0]] }
-            );
+            let url;
 
-            const robloxUser = userRes.data.data[0];
-            if (!robloxUser) return message.reply("User not found.");
+            if (!isNaN(args[0])) {
+                url = `https://users.roblox.com/v1/users/${args[0]}`;
+            } else {
+                const userRes = await axios.post(
+                    "https://users.roblox.com/v1/usernames/users",
+                    { usernames: [args[0]] }
+                );
 
-            const infoRes = await axios.get(
-                `https://users.roblox.com/v1/users/${robloxUser.id}`
-            );
+                const robloxUser = userRes.data.data[0];
+                if (!robloxUser) return message.reply("User not found.");
+
+                url = `https://users.roblox.com/v1/users/${robloxUser.id}`;
+            }
+
+            const infoRes = await axios.get(url);
 
             const avatarRes = await axios.get(
-                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png`
+                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${infoRes.data.id}&size=420x420&format=Png`
             );
 
             const avatar = avatarRes.data.data[0].imageUrl;
@@ -146,9 +174,8 @@ client.on("messageCreate", async message => {
                 .addFields(
                     { name: "Username", value: infoRes.data.name },
                     { name: "Display Name", value: infoRes.data.displayName },
-                    { name: "User ID", value: robloxUser.id.toString() },
+                    { name: "User ID", value: infoRes.data.id.toString() },
                     { name: "Bio", value: infoRes.data.description || "No bio" },
-                    { name: "Profile Link", value: `https://www.roblox.com/users/${robloxUser.id}/profile` },
                     { name: "Created", value: moment(infoRes.data.created).format("LLLL") }
                 );
 
