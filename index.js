@@ -7,9 +7,16 @@ const {
 
 const axios = require("axios");
 const moment = require("moment");
+const http = require("http");
 
 const TOKEN = process.env.TOKEN;
 const PREFIX = "*";
+
+/* Railway / Hosting Keep Alive */
+http.createServer((req, res) => {
+    res.write("Bot Alive");
+    res.end();
+}).listen(process.env.PORT || 3000);
 
 if (!TOKEN) {
     console.log("TOKEN missing");
@@ -24,40 +31,43 @@ const client = new Client({
         GatewayIntentBits.DirectMessages,
         GatewayIntentBits.GuildMembers
     ],
-    partials: [Partials.Channel, Partials.Message, Partials.User]
+    partials: [
+        Partials.Channel,
+        Partials.Message,
+        Partials.User
+    ]
 });
 
-client.once("ready", () => {
+client.on("ready", () => {
     console.log(`Online → ${client.user.tag}`);
 });
 
-/* ================= COMMAND HANDLER ================= */
+/* ================= COMMANDS ================= */
 
 client.on("messageCreate", async message => {
 
-    if (!message.content.startsWith(PREFIX)) return;
     if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    /* ================= HELP ================= */
+    /* HELP */
 
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🧠 INTELLIGENCE COMMANDS")
+            .setTitle("🧠 BOT COMMANDS")
             .setColor("Purple")
             .addFields(
-                { name: "*dlookup", value: "Discord public profile report" },
-                { name: "*rlookup", value: "Roblox public profile report" },
-                { name: "*help", value: "Show commands" }
+                { name: "*dlookup @user", value: "Discord public profile" },
+                { name: "*rlookup username", value: "Roblox public profile" }
             );
 
         return message.reply({ embeds: [embed] });
     }
 
-    /* ================= DISCORD LOOKUP ================= */
+    /* DISCORD LOOKUP */
 
     if (command === "dlookup") {
 
@@ -76,27 +86,24 @@ client.on("messageCreate", async message => {
             const member = message.guild?.members.cache.get(user.id);
 
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
+                .setTitle("🧠 DISCORD PUBLIC PROFILE")
                 .setColor("DarkRed")
-                .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 512 }))
+                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: "Username", value: user.tag, inline: true },
                     { name: "User ID", value: user.id, inline: true },
-                    { name: "Bot Account", value: user.bot ? "Yes" : "No", inline: true },
-                    { name: "Created Account", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
                     { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
-                )
-                .setFooter({ text: "Public Discord Data Only" })
-                .setTimestamp();
+                );
 
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Discord lookup failed.");
+            return message.reply("Lookup failed.");
         }
     }
 
-    /* ================= ROBLOX LOOKUP ================= */
+    /* ROBLOX LOOKUP */
 
     if (command === "rlookup") {
 
@@ -110,7 +117,7 @@ client.on("messageCreate", async message => {
             );
 
             const robloxUser = userRes.data.data[0];
-            if (!robloxUser) return message.reply("Roblox user not found.");
+            if (!robloxUser) return message.reply("User not found.");
 
             const infoRes = await axios.get(
                 `https://users.roblox.com/v1/users/${robloxUser.id}`
@@ -123,7 +130,7 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
+                .setTitle("🎮 ROBLOX PUBLIC PROFILE")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
@@ -131,10 +138,8 @@ client.on("messageCreate", async message => {
                     { name: "Display Name", value: infoRes.data.displayName, inline: true },
                     { name: "User ID", value: robloxUser.id.toString(), inline: true },
                     { name: "Bio", value: infoRes.data.description || "No bio" },
-                    { name: "Account Created", value: moment(infoRes.data.created).format("LLLL") }
-                )
-                .setFooter({ text: "Public Roblox Data Only" })
-                .setTimestamp();
+                    { name: "Created", value: moment(infoRes.data.created).format("LLLL") }
+                );
 
             return message.reply({ embeds: [embed] });
 
