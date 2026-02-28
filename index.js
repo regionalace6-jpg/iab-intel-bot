@@ -12,14 +12,12 @@ const http = require("http");
 const TOKEN = process.env.TOKEN;
 const PREFIX = "!";
 
-/* Railway Keep Alive */
+/* Keep Alive */
 
 http.createServer((req, res) => {
     res.write("Alive");
     res.end();
 }).listen(process.env.PORT || 3000);
-
-/* Client */
 
 const client = new Client({
     intents: [
@@ -33,7 +31,7 @@ const client = new Client({
 });
 
 client.on("ready", () => {
-    console.log(`🔥 SUPER ELITE INTEL ONLINE → ${client.user.tag}`);
+    console.log(`😈 NIGHTMARE INTEL ONLINE → ${client.user.tag}`);
 });
 
 /* COMMANDS */
@@ -51,32 +49,15 @@ client.on("messageCreate", async message => {
     if (command === "help") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🔥 SUPER ELITE INTELLIGENCE BOT")
-            .setColor("Purple")
+            .setTitle("😈 NIGHTMARE INTELLIGENCE SYSTEM")
+            .setColor("Red")
             .setDescription(`
-**Commands Explained**
+Commands:
 
-!help → Shows this menu  
-
-!dlookup @user / ID → Shows Discord public profile intelligence  
-Includes:
-• Username  
-• User ID  
-• Account creation time  
-• Server join time  
-• Avatar  
-
-!rlookup username / ID → Roblox public profile intelligence  
-Includes:
-• Username  
-• Display Name  
-• User ID  
-• Bio  
-• Creation time  
-
-!osint → Shows OSINT search tools  
-
-!ip ipaddress → Shows geolocation info
+!dlookup → Discord intelligence report  
+!rlookup → Roblox intelligence report  
+!osint → Intelligence search portals  
+!profile → Developer profile style report
 `);
 
         return message.reply({ embeds: [embed] });
@@ -87,7 +68,7 @@ Includes:
     if (command === "osint") {
 
         const embed = new EmbedBuilder()
-            .setTitle("🌐 OSINT TOOL MENU")
+            .setTitle("🌐 NIGHTMARE OSINT GATEWAY")
             .setColor("Gold")
             .addFields(
                 { name: "Username Search", value: "https://namechk.com" },
@@ -110,28 +91,27 @@ Includes:
                 user = message.mentions.users.first();
             } else if (args[0]) {
                 user = await client.users.fetch(args[0]);
-            } else {
-                return message.reply("Mention user or provide ID.");
-            }
+            } else return message.reply("Provide user.");
 
             const member = message.guild?.members.cache.get(user.id);
 
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
+                .setTitle("😈 DISCORD DOSSIER REPORT")
                 .setColor("DarkRed")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: "Username", value: user.tag },
                     { name: "User ID", value: user.id },
-                    { name: "Bot Account", value: user.bot ? "Yes" : "No" },
-                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
-                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
-                );
+                    { name: "Created", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
+                    { name: "Public Profile", value: `https://discord.com/users/${user.id}` }
+                )
+                .setFooter({ text: "Public Intelligence Report" });
 
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Discord lookup failed.");
+            return message.reply("Lookup failed.");
         }
     }
 
@@ -139,43 +119,38 @@ Includes:
 
     if (command === "rlookup") {
 
-        if (!args[0]) return message.reply("Provide Roblox username or ID.");
+        if (!args[0]) return message.reply("Provide username.");
 
         try {
 
-            let url;
+            const userRes = await axios.post(
+                "https://users.roblox.com/v1/usernames/users",
+                { usernames: [args[0]] }
+            );
 
-            if (!isNaN(args[0])) {
-                url = `https://users.roblox.com/v1/users/${args[0]}`;
-            } else {
-                const userRes = await axios.post(
-                    "https://users.roblox.com/v1/usernames/users",
-                    { usernames: [args[0]] }
-                );
+            const robloxUser = userRes.data.data[0];
+            if (!robloxUser) return message.reply("User not found.");
 
-                const robloxUser = userRes.data.data[0];
-                if (!robloxUser) return message.reply("User not found.");
-
-                url = `https://users.roblox.com/v1/users/${robloxUser.id}`;
-            }
-
-            const infoRes = await axios.get(url);
+            const infoRes = await axios.get(
+                `https://users.roblox.com/v1/users/${robloxUser.id}`
+            );
 
             const avatarRes = await axios.get(
-                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${infoRes.data.id}&size=420x420&format=Png`
+                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png`
             );
 
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
+                .setTitle("🎮 ROBLOX DOSSIER REPORT")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
                     { name: "Username", value: infoRes.data.name },
                     { name: "Display Name", value: infoRes.data.displayName },
-                    { name: "User ID", value: infoRes.data.id.toString() },
+                    { name: "User ID", value: robloxUser.id.toString() },
                     { name: "Bio", value: infoRes.data.description || "No bio" },
+                    { name: "Profile Link", value: `https://www.roblox.com/users/${robloxUser.id}/profile` },
                     { name: "Created", value: moment(infoRes.data.created).format("LLLL") }
                 );
 
@@ -183,35 +158,6 @@ Includes:
 
         } catch {
             return message.reply("Roblox lookup failed.");
-        }
-    }
-
-    /* IP */
-
-    if (command === "ip") {
-
-        if (!args[0]) return message.reply("Provide IP.");
-
-        try {
-
-            const geo = await axios.get(`http://ip-api.com/json/${args[0]}`);
-
-            const data = geo.data;
-
-            const embed = new EmbedBuilder()
-                .setTitle("🌍 IP GEO INTEL")
-                .setColor("Green")
-                .addFields(
-                    { name: "Country", value: data.country },
-                    { name: "Region", value: data.regionName },
-                    { name: "City", value: data.city },
-                    { name: "ISP", value: data.isp }
-                );
-
-            return message.reply({ embeds: [embed] });
-
-        } catch {
-            return message.reply("IP lookup failed.");
         }
     }
 
