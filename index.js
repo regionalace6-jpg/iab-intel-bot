@@ -7,23 +7,15 @@ const {
 
 const axios = require("axios");
 const fs = require("fs");
-const whois = require("whois");
+const whois = require("whois-json");
 const geoip = require("geoip-lite");
 const moment = require("moment");
-const dns = require("dns");
-const util = require("util");
-
-const dnsLookup = util.promisify(dns.lookup);
-const dnsResolve = util.promisify(dns.resolve);
-
-const whoisLookup = util.promisify(whois.lookup);
 
 // ================= CONFIG =================
 
 const TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = "924501682619052042";
 const LOG_CHANNEL_ID = "1475519152616898670";
-
 const PREFIX = "*";
 
 if (!TOKEN) {
@@ -49,7 +41,9 @@ const ACCESS_FILE = "./access.json";
 let accessList = new Set([OWNER_ID]);
 
 if (fs.existsSync(ACCESS_FILE)) {
-    accessList = new Set(JSON.parse(fs.readFileSync(ACCESS_FILE)));
+    try {
+        accessList = new Set(JSON.parse(fs.readFileSync(ACCESS_FILE)));
+    } catch {}
 }
 
 function saveAccess() {
@@ -94,7 +88,7 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // ================= GRANT =================
+    // OWNER ACCESS GRANT
 
     if (command === "grant") {
 
@@ -109,8 +103,6 @@ client.on("messageCreate", async message => {
 
         return message.reply("Access granted.");
     }
-
-    // ================= ACCESS CHECK =================
 
     if (!hasAccess(message.author.id))
         return message.reply("Access Denied.");
@@ -142,6 +134,8 @@ client.on("messageCreate", async message => {
                 { name: "Created", value: moment(user.createdAt).format("LLLL") }
             )
             .setTimestamp();
+
+        await logAction(`Discord scan: ${user.tag}`);
 
         return message.reply({ embeds: [embed] });
     }
@@ -184,10 +178,12 @@ client.on("messageCreate", async message => {
                 )
                 .setTimestamp();
 
+            await logAction(`Roblox scan: ${infoRes.data.name}`);
+
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Roblox lookup failed.");
+            return message.reply("Roblox scan failed.");
         }
     }
 
@@ -199,12 +195,18 @@ client.on("messageCreate", async message => {
 
         try {
 
-            const result = await whoisLookup(args[0]);
+            const result = await whois(args[0]);
 
             const embed = new EmbedBuilder()
-                .setTitle("🌐 DOMAIN INTELLIGENCE")
+                .setTitle("🌐 DOMAIN INTELLIGENCE DOSSIER")
                 .setColor("DarkGreen")
-                .setDescription("```\n" + result + "\n```");
+                .addFields(
+                    { name: "Domain", value: args[0] },
+                    { name: "Registrar", value: result.registrar || "Unknown" },
+                    { name: "Created", value: result.creationDate || "Unknown" },
+                    { name: "Expiry", value: result.registryExpiryDate || "Unknown" }
+                )
+                .setTimestamp();
 
             return message.reply({ embeds: [embed] });
 
