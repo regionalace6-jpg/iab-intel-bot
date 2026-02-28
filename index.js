@@ -10,7 +10,6 @@ const moment = require("moment");
 
 const TOKEN = process.env.TOKEN;
 const PREFIX = "*";
-const OWNER_ID = "924501682619052042";
 
 if (!TOKEN) {
     console.log("TOKEN missing");
@@ -25,14 +24,14 @@ const client = new Client({
         GatewayIntentBits.DirectMessages,
         GatewayIntentBits.GuildMembers
     ],
-    partials: [Partials.Channel, Partials.User, Partials.Message]
+    partials: [Partials.Channel, Partials.Message, Partials.User]
 });
 
 client.once("ready", () => {
     console.log(`Online → ${client.user.tag}`);
 });
 
-/* ================= COMMANDS ================= */
+/* ================= COMMAND HANDLER ================= */
 
 client.on("messageCreate", async message => {
 
@@ -42,19 +41,23 @@ client.on("messageCreate", async message => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    /* GRANT ACCESS */
+    /* ================= HELP ================= */
 
-    if (command === "grant") {
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
+    if (command === "help") {
 
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
+        const embed = new EmbedBuilder()
+            .setTitle("🧠 INTELLIGENCE COMMANDS")
+            .setColor("Purple")
+            .addFields(
+                { name: "*dlookup", value: "Discord public profile report" },
+                { name: "*rlookup", value: "Roblox public profile report" },
+                { name: "*help", value: "Show commands" }
+            );
 
-        return message.reply("Access system removed in this version.");
+        return message.reply({ embeds: [embed] });
     }
 
-    /* DISCORD LOOKUP */
+    /* ================= DISCORD LOOKUP ================= */
 
     if (command === "dlookup") {
 
@@ -73,26 +76,27 @@ client.on("messageCreate", async message => {
             const member = message.guild?.members.cache.get(user.id);
 
             const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD PUBLIC PROFILE")
+                .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
                 .setColor("DarkRed")
-                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+                .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 512 }))
                 .addFields(
                     { name: "Username", value: user.tag, inline: true },
                     { name: "User ID", value: user.id, inline: true },
                     { name: "Bot Account", value: user.bot ? "Yes" : "No", inline: true },
-                    { name: "Created At", value: moment(user.createdAt).format("LLLL") },
+                    { name: "Created Account", value: moment(user.createdAt).format("LLLL") },
                     { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
                 )
+                .setFooter({ text: "Public Discord Data Only" })
                 .setTimestamp();
 
             return message.reply({ embeds: [embed] });
 
         } catch {
-            return message.reply("Lookup failed.");
+            return message.reply("Discord lookup failed.");
         }
     }
 
-    /* ROBLOX LOOKUP */
+    /* ================= ROBLOX LOOKUP ================= */
 
     if (command === "rlookup") {
 
@@ -106,7 +110,7 @@ client.on("messageCreate", async message => {
             );
 
             const robloxUser = userRes.data.data[0];
-            if (!robloxUser) return message.reply("User not found.");
+            if (!robloxUser) return message.reply("Roblox user not found.");
 
             const infoRes = await axios.get(
                 `https://users.roblox.com/v1/users/${robloxUser.id}`
@@ -119,7 +123,7 @@ client.on("messageCreate", async message => {
             const avatar = avatarRes.data.data[0].imageUrl;
 
             const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX PUBLIC PROFILE")
+                .setTitle("🎮 ROBLOX INTELLIGENCE REPORT")
                 .setColor("Blue")
                 .setThumbnail(avatar)
                 .addFields(
@@ -129,6 +133,7 @@ client.on("messageCreate", async message => {
                     { name: "Bio", value: infoRes.data.description || "No bio" },
                     { name: "Account Created", value: moment(infoRes.data.created).format("LLLL") }
                 )
+                .setFooter({ text: "Public Roblox Data Only" })
                 .setTimestamp();
 
             return message.reply({ embeds: [embed] });
@@ -136,22 +141,6 @@ client.on("messageCreate", async message => {
         } catch {
             return message.reply("Roblox lookup failed.");
         }
-    }
-
-    /* HELP */
-
-    if (command === "help") {
-
-        const embed = new EmbedBuilder()
-            .setTitle("COMMANDS")
-            .setColor("Purple")
-            .addFields(
-                { name: "*dlookup", value: "Discord public profile scan" },
-                { name: "*rlookup", value: "Roblox public profile scan" },
-                { name: "*help", value: "Show commands" }
-            );
-
-        return message.reply({ embeds: [embed] });
     }
 
 });
