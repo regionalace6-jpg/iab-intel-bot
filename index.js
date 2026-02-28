@@ -10,9 +10,9 @@ const fs = require("fs");
 const geoip = require("geoip-lite");
 const moment = require("moment");
 
-// ================= CONFIG =================
+/* ================= CONFIG ================= */
 
-const TOKEN = process.env.TOKEN; // <-- MATCH YOUR RAILWAY VARIABLE NAME
+const TOKEN = process.env.TOKEN;
 const OWNER_ID = "924501682619052042";
 const PREFIX = "*";
 const LOG_CHANNEL_ID = "1475519152616898670";
@@ -22,7 +22,7 @@ if (!TOKEN) {
     process.exit(1);
 }
 
-// ================= CLIENT =================
+/* ================= CLIENT ================= */
 
 const client = new Client({
     intents: [
@@ -32,14 +32,10 @@ const client = new Client({
         GatewayIntentBits.DirectMessages,
         GatewayIntentBits.GuildMembers
     ],
-    partials: [
-        Partials.Channel,
-        Partials.Message,
-        Partials.User
-    ]
+    partials: [Partials.Channel, Partials.Message, Partials.User]
 });
 
-// ================= ACCESS SYSTEM =================
+/* ================= ACCESS SYSTEM ================= */
 
 const ACCESS_FILE = "./access.json";
 let accessList = new Set([OWNER_ID]);
@@ -60,7 +56,7 @@ function hasAccess(id) {
     return accessList.has(id);
 }
 
-// ================= LOGGING =================
+/* ================= LOGGING ================= */
 
 async function logAction(text) {
     if (!LOG_CHANNEL_ID) return;
@@ -79,13 +75,13 @@ async function logAction(text) {
     } catch {}
 }
 
-// ================= READY =================
+/* ================= READY ================= */
 
 client.once("ready", () => {
     console.log(`Intelligence Suite Online → ${client.user.tag}`);
 });
 
-// ================= COMMANDS =================
+/* ================= COMMAND SYSTEM ================= */
 
 client.on("messageCreate", async message => {
 
@@ -98,7 +94,7 @@ client.on("messageCreate", async message => {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // OWNER ACCESS
+        /* OWNER GRANT */
 
         if (command === "grant") {
 
@@ -117,19 +113,23 @@ client.on("messageCreate", async message => {
         if (!hasAccess(message.author.id))
             return message.reply("Access Denied.");
 
-        // DISCORD INTEL
+        /* ================= DISCORD LOOKUP ================= */
 
         if (command === "dlookup") {
 
-            let user;
-
             try {
+
+                let user;
 
                 if (message.mentions.users.first()) {
                     user = message.mentions.users.first();
-                } else {
+                } else if (args[0]) {
                     user = await client.users.fetch(args[0]);
+                } else {
+                    return message.reply("Mention user or provide ID.");
                 }
+
+                const member = message.guild?.members.cache.get(user.id);
 
                 const embed = new EmbedBuilder()
                     .setTitle("🧠 DISCORD INTELLIGENCE REPORT")
@@ -138,21 +138,24 @@ client.on("messageCreate", async message => {
                     .addFields(
                         { name: "Username", value: user.tag, inline: true },
                         { name: "User ID", value: user.id, inline: true },
-                        { name: "Created", value: moment(user.createdAt).format("LLLL") }
-                    );
+                        { name: "Bot", value: user.bot ? "Yes" : "No", inline: true },
+                        { name: "Account Created", value: moment(user.createdAt).format("LLLL") },
+                        { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" }
+                    )
+                    .setTimestamp();
 
                 return message.reply({ embeds: [embed] });
 
             } catch {
-                return message.reply("Lookup failed.");
+                return message.reply("Discord lookup failed.");
             }
         }
 
-        // ROBLOX INTEL
+        /* ================= ROBLOX LOOKUP ================= */
 
         if (command === "rlookup") {
 
-            if (!args[0]) return message.reply("Provide username.");
+            if (!args[0]) return message.reply("Provide Roblox username.");
 
             try {
 
@@ -181,8 +184,11 @@ client.on("messageCreate", async message => {
                     .addFields(
                         { name: "Username", value: infoRes.data.name, inline: true },
                         { name: "Display Name", value: infoRes.data.displayName, inline: true },
-                        { name: "Bio", value: infoRes.data.description || "No bio" }
-                    );
+                        { name: "User ID", value: robloxUser.id.toString(), inline: true },
+                        { name: "Bio", value: infoRes.data.description || "No bio" },
+                        { name: "Account Created", value: moment(infoRes.data.created).format("LLLL") }
+                    )
+                    .setTimestamp();
 
                 return message.reply({ embeds: [embed] });
 
@@ -191,14 +197,13 @@ client.on("messageCreate", async message => {
             }
         }
 
-        // IP INTEL
+        /* ================= IP LOOKUP ================= */
 
         if (command === "ip") {
 
             if (!args[0]) return message.reply("Provide IP.");
 
             const geo = geoip.lookup(args[0]);
-
             if (!geo) return message.reply("No data found.");
 
             const embed = new EmbedBuilder()
@@ -212,6 +217,8 @@ client.on("messageCreate", async message => {
 
             return message.reply({ embeds: [embed] });
         }
+
+        /* ================= HELP ================= */
 
         if (command === "help") {
 
