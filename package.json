@@ -1,6 +1,6 @@
 {
-  "name": "nightmare-intel-bot",
-  "version": "8.0.0",
+  "name": "ultra-nightmare-intel-bot",
+  "version": "9.0.0",
   "main": "index.js",
   "dependencies": {
     "discord.js": "^14.15.0",
