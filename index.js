@@ -9,53 +9,31 @@ const {
 
 const axios = require("axios");
 const dns = require("dns").promises;
-const whois = require("whois-json");
 const crypto = require("crypto");
 
 const TOKEN = process.env.TOKEN;
 const OWNER_ID = "924501682619052042";
-const LOG_CHANNEL_ID = "1475519152616898670";
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
 /* ===============================
-   CLEARANCE SYSTEM
+   ACCESS CONTROL
 ================================= */
 
-const clearance = {
-  owner: new Set([OWNER_ID]),
-  tier1: new Set(),
-  tier2: new Set()
-};
-
-function getClearance(id) {
-  if (clearance.owner.has(id)) return "OWNER";
-  if (clearance.tier2.has(id)) return "TIER2";
-  if (clearance.tier1.has(id)) return "TIER1";
-  return "NONE";
-}
-
-function hasAccess(id, required = "TIER1") {
-  const level = getClearance(id);
-
-  if (level === "OWNER") return true;
-  if (required === "TIER2" && level === "TIER2") return true;
-  if (required === "TIER1" && (level === "TIER1" || level === "TIER2")) return true;
-
-  return false;
+function hasAccess(id) {
+  return id === OWNER_ID;
 }
 
 /* ===============================
-   THREAT SCORING
+   RISK SCORE
 ================================= */
 
 function riskScore(flags) {
   let score = 0;
   if (flags.newAccount) score += 30;
   if (flags.noAvatar) score += 15;
-  if (flags.lowData) score += 20;
   return Math.min(score, 100);
 }
 
@@ -68,54 +46,42 @@ const commands = [
     .setName("discord")
     .setDescription("Discord account intelligence")
     .addUserOption(o =>
-      o.setName("user")
-        .setDescription("Target user")
-        .setRequired(true)
+      o.setName("user").setDescription("Target user").setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName("roblox")
     .setDescription("Roblox intelligence")
     .addStringOption(o =>
-      o.setName("username")
-        .setDescription("Roblox username")
-        .setRequired(true)
+      o.setName("username").setDescription("Username").setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName("ip")
     .setDescription("IP intelligence")
     .addStringOption(o =>
-      o.setName("address")
-        .setDescription("IP address")
-        .setRequired(true)
+      o.setName("address").setDescription("IP address").setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName("email")
-    .setDescription("Email intelligence")
+    .setDescription("Email domain intelligence")
     .addStringOption(o =>
-      o.setName("address")
-        .setDescription("Email address")
-        .setRequired(true)
+      o.setName("address").setDescription("Email").setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName("domain")
     .setDescription("Domain WHOIS lookup")
     .addStringOption(o =>
-      o.setName("name")
-        .setDescription("Domain name")
-        .setRequired(true)
+      o.setName("name").setDescription("Domain").setRequired(true)
     ),
 
   new SlashCommandBuilder()
     .setName("hash")
-    .setDescription("Generate SHA256 hash")
+    .setDescription("SHA256 hash")
     .addStringOption(o =>
-      o.setName("text")
-        .setDescription("Text to hash")
-        .setRequired(true)
+      o.setName("text").setDescription("Text").setRequired(true)
     ),
 
   new SlashCommandBuilder()
@@ -123,7 +89,7 @@ const commands = [
     .setDescription("Encode or decode base64")
     .addStringOption(o =>
       o.setName("mode")
-        .setDescription("encode or decode")
+        .setDescription("encode/decode")
         .setRequired(true)
         .addChoices(
           { name: "encode", value: "encode" },
@@ -131,27 +97,20 @@ const commands = [
         )
     )
     .addStringOption(o =>
-      o.setName("text")
-        .setDescription("Text")
-        .setRequired(true)
+      o.setName("text").setDescription("Text").setRequired(true)
     )
-].map(cmd => cmd.toJSON());
-
-/* ===============================
-   REGISTER COMMANDS
-================================= */
+].map(c => c.toJSON());
 
 client.once("ready", async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
   const rest = new REST({ version: "10" }).setToken(TOKEN);
-
   await rest.put(
     Routes.applicationCommands(client.user.id),
     { body: commands }
   );
 
-  console.log("Global slash commands registered.");
+  console.log("Slash commands registered globally.");
 });
 
 /* ===============================
@@ -161,7 +120,7 @@ client.once("ready", async () => {
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  if (!hasAccess(interaction.user.id, "TIER1")) {
+  if (!hasAccess(interaction.user.id)) {
     return interaction.reply({
       content: "🚫 Access denied.",
       ephemeral: true
@@ -172,9 +131,7 @@ client.on("interactionCreate", async interaction => {
 
   const cmd = interaction.commandName;
 
-/* ===============================
-   DISCORD
-================================= */
+/* DISCORD */
 
   if (cmd === "discord") {
     const user = interaction.options.getUser("user");
@@ -188,7 +145,7 @@ client.on("interactionCreate", async interaction => {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle("Discord Intelligence Report")
+      .setTitle("Discord Intelligence")
       .setThumbnail(user.displayAvatarURL())
       .addFields(
         { name: "Tag", value: user.tag },
@@ -201,9 +158,7 @@ client.on("interactionCreate", async interaction => {
     return interaction.editReply({ embeds: [embed] });
   }
 
-/* ===============================
-   ROBLOX
-================================= */
+/* ROBLOX */
 
   if (cmd === "roblox") {
     const username = interaction.options.getString("username");
@@ -217,24 +172,16 @@ client.on("interactionCreate", async interaction => {
       const user = res.data.data[0];
       if (!user) return interaction.editReply("User not found.");
 
-      const embed = new EmbedBuilder()
-        .setTitle("Roblox Intelligence Report")
-        .addFields(
-          { name: "Username", value: user.name },
-          { name: "User ID", value: user.id.toString() }
-        )
-        .setColor("Red");
-
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.editReply(
+        `Username: ${user.name}\nUser ID: ${user.id}`
+      );
 
     } catch {
       return interaction.editReply("Roblox lookup failed.");
     }
   }
 
-/* ===============================
-   IP
-================================= */
+/* IP */
 
   if (cmd === "ip") {
     const ip = interaction.options.getString("address");
@@ -243,79 +190,52 @@ client.on("interactionCreate", async interaction => {
       const res = await axios.get(`http://ip-api.com/json/${ip}`);
       const d = res.data;
 
-      const embed = new EmbedBuilder()
-        .setTitle("IP Intelligence Report")
-        .addFields(
-          { name: "Country", value: d.country || "N/A" },
-          { name: "ISP", value: d.isp || "N/A" },
-          { name: "ASN", value: d.as || "N/A" }
-        )
-        .setColor("Purple");
-
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.editReply(
+        `Country: ${d.country}\nISP: ${d.isp}\nASN: ${d.as}`
+      );
 
     } catch {
-      return interaction.editReply("Invalid IP address.");
+      return interaction.editReply("Invalid IP.");
     }
   }
 
-/* ===============================
-   EMAIL
-================================= */
+/* EMAIL */
 
   if (cmd === "email") {
     const email = interaction.options.getString("address");
     const domain = email.split("@")[1];
 
-    if (!domain) return interaction.editReply("Invalid email.");
-
     try {
       const mx = await dns.resolveMx(domain);
-
-      const embed = new EmbedBuilder()
-        .setTitle("Email Intelligence Report")
-        .addFields(
-          { name: "Domain", value: domain },
-          { name: "MX Records Found", value: mx.length.toString() }
-        )
-        .setColor("Orange");
-
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.editReply(
+        `Domain: ${domain}\nMX Records: ${mx.length}`
+      );
 
     } catch {
       return interaction.editReply("Domain lookup failed.");
     }
   }
 
-/* ===============================
-   DOMAIN
-================================= */
+/* DOMAIN */
 
   if (cmd === "domain") {
     const domain = interaction.options.getString("name");
 
     try {
-      const data = await whois(domain);
+      const res = await axios.get(
+        `https://api.hackertarget.com/whois/?q=${domain}`
+      );
 
-      const embed = new EmbedBuilder()
-        .setTitle("Domain Intelligence Report")
-        .setDescription(
-          "```json\n" +
-          JSON.stringify(data, null, 2).slice(0, 1800) +
-          "\n```"
-        )
-        .setColor("Grey");
-
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.editReply(
+        "```" + res.data.substring(0, 1900) + "```"
+      );
 
     } catch {
       return interaction.editReply("WHOIS lookup failed.");
     }
   }
 
-/* ===============================
-   HASH
-================================= */
+/* HASH */
 
   if (cmd === "hash") {
     const text = interaction.options.getString("text");
@@ -323,9 +243,7 @@ client.on("interactionCreate", async interaction => {
     return interaction.editReply(hash);
   }
 
-/* ===============================
-   BASE64
-================================= */
+/* BASE64 */
 
   if (cmd === "base64") {
     const mode = interaction.options.getString("mode");
@@ -339,9 +257,5 @@ client.on("interactionCreate", async interaction => {
   }
 
 });
-
-/* ===============================
-   LOGIN
-================================= */
 
 client.login(TOKEN);
