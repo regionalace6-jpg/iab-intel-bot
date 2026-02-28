@@ -1,6 +1,6 @@
 {
-  "name": "legendary-osint-bot",
-  "version": "4.0.0",
+  "name": "final-boss-osint-bot",
+  "version": "5.0.0",
   "main": "index.js",
   "dependencies": {
     "discord.js": "^14.15.0",
