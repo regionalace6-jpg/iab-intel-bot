@@ -20,45 +20,40 @@ client.once("clientReady", () => {
   console.log(`Online → ${client.user.tag}`);
 });
 
-/* SIMPLE AI */
+/* SIMPLE OFFLINE AI */
 
-function aiResponse(msg){
+function aiResponse(msg) {
 
 msg = msg.toLowerCase();
 
 if(msg.includes("hello") || msg.includes("hi"))
-return "Greetings Lord Optic.";
+return "Greetings Lord Optic. How may I assist you?";
 
 if(msg.includes("commands"))
-return "Lord Optic, use !help to see my commands.";
+return "Lord Optic, use **!help** to see my command list.";
 
 if(msg.includes("who are you"))
 return "I am your intelligence assistant bot, Lord Optic.";
 
-if(msg.includes("help"))
-return "Lord Optic, try !help.";
+if(msg.includes("roblox"))
+return "Lord Optic, use **!rlookup username** to inspect a Roblox account.";
 
-return "Understood Lord Optic.";
+return "Understood, Lord Optic.";
 }
 
 client.on("messageCreate", async (message) => {
 
 if(message.author.bot) return;
 
-/* AUTO AI (DM OR MENTION) */
+/* AUTO REPLY IF DM OR MENTION */
 
 if(
 message.channel.type === 1 ||
 message.mentions.has(client.user)
 ){
-
 if(!message.content.startsWith(PREFIX)){
-
-const reply = aiResponse(message.content);
-return message.reply(reply);
-
+return message.reply(aiResponse(message.content));
 }
-
 }
 
 /* COMMAND SYSTEM */
@@ -74,27 +69,35 @@ if(command === "help"){
 
 const embed = new EmbedBuilder()
 
-.setTitle("🧠 Intelligence Bot")
+.setTitle("🧠 Intelligence Bot Command List")
+
+.setColor("Red")
 
 .setDescription(`
-!help → command list
+**Core**
+!help → show command list  
+!ping → bot latency  
+!botinfo → bot statistics  
 
-!ping → latency
-!botinfo → bot stats
+**Profile Tools**
+!avatar [@user] → view avatar  
+!banner [@user] → view banner  
 
-!avatar
-!banner
+**Intelligence**
+!dlookup [@user/id] → Discord account lookup  
+!rlookup [username] → Roblox profile lookup  
 
-!dlookup
-!rlookup
+**OSINT**
+!scan [username] → scan username across sites  
 
-!scan
-!usersearch
+**AI**
+!ask [question] → talk to bot  
 
-!ask
-`)
-
-.setColor("Red");
+**Admin**
+!grant @user → add team member  
+!revoke @user → remove team member  
+!team → show team list
+`);
 
 return message.reply({embeds:[embed]});
 }
@@ -102,7 +105,7 @@ return message.reply({embeds:[embed]});
 /* PING */
 
 if(command === "ping"){
-return message.reply(`Pong ${client.ws.ping}ms`);
+return message.reply(`🏓 Pong → ${client.ws.ping}ms`);
 }
 
 /* BOT INFO */
@@ -113,13 +116,13 @@ const embed = new EmbedBuilder()
 
 .setTitle("Bot Statistics")
 
+.setColor("Blue")
+
 .addFields(
 {name:"Servers",value:`${client.guilds.cache.size}`,inline:true},
 {name:"Users",value:`${client.users.cache.size}`,inline:true},
 {name:"Ping",value:`${client.ws.ping}ms`,inline:true}
-)
-
-.setColor("Blue");
+);
 
 return message.reply({embeds:[embed]});
 }
@@ -134,7 +137,9 @@ const embed = new EmbedBuilder()
 
 .setTitle(`${user.username}'s Avatar`)
 
-.setImage(user.displayAvatarURL({size:1024}));
+.setImage(user.displayAvatarURL({size:1024}))
+
+.setColor("Purple");
 
 return message.reply({embeds:[embed]});
 }
@@ -179,18 +184,18 @@ return message.reply("User not found.");
 
 const embed = new EmbedBuilder()
 
-.setTitle("Discord User Lookup")
+.setTitle("🔎 Discord User Lookup")
 
 .setThumbnail(user.displayAvatarURL())
+
+.setColor("Purple")
 
 .addFields(
 {name:"Username",value:user.tag,inline:true},
 {name:"User ID",value:user.id,inline:true},
 {name:"Bot",value:`${user.bot}`,inline:true},
-{name:"Created",value:`<t:${Math.floor(user.createdTimestamp/1000)}:R>`,inline:true}
-)
-
-.setColor("Purple");
+{name:"Account Created",value:`<t:${Math.floor(user.createdTimestamp/1000)}:R>`,inline:true}
+);
 
 return message.reply({embeds:[embed]});
 }
@@ -200,7 +205,7 @@ return message.reply({embeds:[embed]});
 if(command === "rlookup"){
 
 if(!args[0])
-return message.reply("Provide Roblox username.");
+return message.reply("Provide a Roblox username.");
 
 try{
 
@@ -220,19 +225,19 @@ const avatar = await axios.get(
 
 const embed = new EmbedBuilder()
 
-.setTitle("Roblox Profile")
+.setTitle("🎮 Roblox Profile")
 
 .setURL(`https://www.roblox.com/users/${user.id}/profile`)
 
 .setThumbnail(avatar.data.data[0].imageUrl)
 
+.setColor("Green")
+
 .addFields(
 {name:"Username",value:user.name,inline:true},
 {name:"Display Name",value:user.displayName,inline:true},
 {name:"User ID",value:`${user.id}`,inline:true}
-)
-
-.setColor("Green");
+);
 
 return message.reply({embeds:[embed]});
 
@@ -246,14 +251,14 @@ return message.reply("Roblox lookup failed.");
 
 /* USERNAME SCAN */
 
-if(command === "scan" || command === "usersearch"){
+if(command === "scan"){
 
 if(!args[0])
 return message.reply("Provide username.");
 
 const u = args[0];
 
-const sites = [
+const sites=[
 
 `https://github.com/${u}`,
 `https://twitter.com/${u}`,
@@ -263,31 +268,76 @@ const sites = [
 `https://youtube.com/@${u}`,
 `https://tiktok.com/@${u}`,
 `https://pinterest.com/${u}`,
-`https://soundcloud.com/${u}`
+`https://soundcloud.com/${u}`,
+`https://steamcommunity.com/id/${u}`
 
 ];
 
-const embed = new EmbedBuilder()
+const embed=new EmbedBuilder()
 
-.setTitle("Username OSINT Scan")
+.setTitle("🌐 Username OSINT Scan")
 
-.setDescription(sites.join("\n"))
+.setColor("Orange")
 
-.setColor("Orange");
+.setDescription(sites.join("\n"));
 
 return message.reply({embeds:[embed]});
 }
 
-/* AI COMMAND */
+/* ASK */
 
 if(command === "ask"){
 
-const question = args.join(" ");
+const question=args.join(" ");
 
 if(!question)
-return message.reply("Ask something Lord Optic.");
+return message.reply("Ask something, Lord Optic.");
 
 return message.reply(aiResponse(question));
+}
+
+/* TEAM SYSTEM */
+
+if(command === "grant"){
+
+if(message.author.id!==OWNER_ID)
+return message.reply("Owner only.");
+
+const user=message.mentions.users.first();
+
+if(!user)
+return message.reply("Mention a user.");
+
+TEAM.push(user.id);
+
+return message.reply(`${user.tag} added to the team.`);
+}
+
+if(command === "revoke"){
+
+if(message.author.id!==OWNER_ID)
+return message.reply("Owner only.");
+
+const user=message.mentions.users.first();
+
+TEAM=TEAM.filter(id=>id!==user.id);
+
+return message.reply(`${user.tag} removed from team.`);
+}
+
+if(command==="team"){
+
+const list=TEAM.map(id=>`<@${id}>`).join("\n");
+
+const embed=new EmbedBuilder()
+
+.setTitle("👑 Bot Team")
+
+.setColor("Yellow")
+
+.setDescription(list);
+
+return message.reply({embeds:[embed]});
 }
 
 });
