@@ -1,302 +1,290 @@
-const {
-    Client,
-    GatewayIntentBits,
-    EmbedBuilder,
-    Partials
-} = require("discord.js");
-
+const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
-const moment = require("moment");
-const fs = require("fs");
-const http = require("http");
 
-const TOKEN = process.env.TOKEN;
 const PREFIX = "!";
+const OWNER_ID = process.env.OWNER_ID;
 
-const OWNER_ID = "924501682619052042";
-
-/* KEEP ALIVE (Railway) */
-
-http.createServer((req, res) => {
-    res.write("Alive");
-    res.end();
-}).listen(process.env.PORT || 3000);
-
-/* CLIENT */
+let TEAM = [OWNER_ID];
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.GuildMembers
-    ],
-    partials: [Partials.Channel, Partials.User, Partials.Message]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-/* ACCESS SYSTEM */
-
-const ACCESS_FILE = "./access.json";
-
-let accessList = new Set([OWNER_ID]);
-
-if (fs.existsSync(ACCESS_FILE)) {
-    try {
-        accessList = new Set(JSON.parse(fs.readFileSync(ACCESS_FILE)));
-    } catch {}
-}
-
-function saveAccess() {
-    fs.writeFileSync(ACCESS_FILE, JSON.stringify([...accessList]));
-}
-
-function hasAccess(id) {
-    return accessList.has(id);
-}
-
-/* READY */
-
-client.on("ready", () => {
-    console.log(`Online → ${client.user.tag}`);
+client.once("clientReady", () => {
+  console.log(`Online → ${client.user.tag}`);
 });
 
-/* COMMANDS */
+/* SIMPLE OFFLINE AI */
 
-client.on("messageCreate", async message => {
+function aiResponse(question) {
 
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
+  question = question.toLowerCase();
 
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
+  if (question.includes("hello") || question.includes("hi"))
+    return "Greetings Lord Optic. How may I assist you today?";
 
-    /* GRANT */
+  if (question.includes("commands"))
+    return "Lord Optic, use !help to see all available commands.";
 
-    if (command === "grant") {
+  if (question.includes("who are you"))
+    return "I am your intelligence assistant bot, Lord Optic.";
 
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
+  if (question.includes("roblox"))
+    return "Lord Optic, you can lookup Roblox users using !rlookup username.";
 
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
+  return "Lord Optic, I am still learning. Try using !help to explore my commands.";
+}
 
-        accessList.add(user.id);
-        saveAccess();
+client.on("messageCreate", async (message) => {
 
-        return message.reply("Team access granted ✅");
-    }
+  if (message.author.bot) return;
+  if (!message.content.startsWith(PREFIX)) return;
 
-    /* REVOKE */
+  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
 
-    if (command === "revoke") {
+  /* HELP */
 
-        if (message.author.id !== OWNER_ID)
-            return message.reply("Owner only.");
+  if (command === "help") {
 
-        const user = message.mentions.users.first();
-        if (!user) return message.reply("Mention user.");
+    const embed = new EmbedBuilder()
+    .setTitle("Intelligence Bot Commands")
+    .setColor("Red")
+    .setDescription(`
+!help → command list
 
-        accessList.delete(user.id);
-        saveAccess();
+!ping → latency
+!botinfo → bot stats
 
-        return message.reply("Team access revoked ❌");
-    }
+!avatar [user]
+!banner [user]
 
-    if (!hasAccess(message.author.id))
-        return message.reply("Access Denied.");
+!dlookup [user/id]
+!rlookup [username]
 
-    /* HELP */
+!usersearch [username]
+!scan [username]
 
-    if (command === "help") {
+!ask [question]
 
-        const embed = new EmbedBuilder()
-            .setTitle("😈 INTELLIGENCE BOT COMMANDS")
-            .setColor("Purple")
-            .setDescription(`
-!dlookup @user / id → Discord intelligence report
-!rlookup username / id → Roblox intelligence report
-!userinfo → User profile info
-!serverinfo → Server info
-!avatar → User avatar
-!banner → User banner
-!osint → OSINT tools
-!ip ipaddress → IP geolocation
-!ping → Bot latency
-!grant @user → Give team access
-!revoke @user → Remove team access
+!grant @user
+!revoke @user
+!team
 `);
 
-        return message.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
+  }
+
+  /* PING */
+
+  if (command === "ping")
+    return message.reply(`Pong: ${client.ws.ping}ms`);
+
+  /* BOT INFO */
+
+  if (command === "botinfo") {
+
+    const embed = new EmbedBuilder()
+    .setTitle("Bot Info")
+    .addFields(
+      { name: "Servers", value: `${client.guilds.cache.size}`, inline: true },
+      { name: "Users", value: `${client.users.cache.size}`, inline: true },
+      { name: "Ping", value: `${client.ws.ping}ms`, inline: true }
+    );
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  /* AVATAR */
+
+  if (command === "avatar") {
+
+    const user = message.mentions.users.first() || message.author;
+
+    const embed = new EmbedBuilder()
+    .setTitle(`${user.username}'s Avatar`)
+    .setImage(user.displayAvatarURL({ size: 1024 }));
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  /* BANNER */
+
+  if (command === "banner") {
+
+    const user = message.mentions.users.first() || message.author;
+
+    const fetched = await client.users.fetch(user.id, { force: true });
+
+    if (!fetched.banner)
+      return message.reply("No banner found.");
+
+    const embed = new EmbedBuilder()
+    .setTitle(`${fetched.username}'s Banner`)
+    .setImage(fetched.bannerURL({ size: 1024 }));
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  /* DISCORD LOOKUP */
+
+  if (command === "dlookup") {
+
+    let user;
+
+    if (message.mentions.users.first())
+      user = message.mentions.users.first();
+    else if (args[0])
+      user = await client.users.fetch(args[0]).catch(() => null);
+    else
+      user = message.author;
+
+    if (!user)
+      return message.reply("User not found.");
+
+    const embed = new EmbedBuilder()
+    .setTitle("Discord Lookup")
+    .setThumbnail(user.displayAvatarURL())
+    .addFields(
+      { name: "Username", value: user.tag, inline: true },
+      { name: "ID", value: user.id, inline: true },
+      { name: "Bot", value: `${user.bot}`, inline: true },
+      { name: "Created", value: `<t:${Math.floor(user.createdTimestamp/1000)}:R>`, inline: true }
+    );
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  /* ROBLOX LOOKUP */
+
+  if (command === "rlookup") {
+
+    if (!args[0])
+      return message.reply("Provide a Roblox username.");
+
+    try {
+
+      const res = await axios.post(
+        "https://users.roblox.com/v1/usernames/users",
+        { usernames:[args[0]] }
+      );
+
+      const user = res.data.data[0];
+
+      if (!user)
+        return message.reply("User not found.");
+
+      const avatar = await axios.get(
+        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png`
+      );
+
+      const embed = new EmbedBuilder()
+      .setTitle("Roblox Lookup")
+      .setThumbnail(avatar.data.data[0].imageUrl)
+      .addFields(
+        { name:"Username", value:user.name, inline:true },
+        { name:"Display Name", value:user.displayName, inline:true },
+        { name:"User ID", value:`${user.id}`, inline:true }
+      );
+
+      return message.reply({ embeds:[embed] });
+
+    } catch {
+
+      return message.reply("Roblox lookup failed.");
+
     }
+  }
 
-    /* PING */
+  /* USERNAME SCAN */
 
-    if (command === "ping") {
-        return message.reply(`🏓 Pong! ${client.ws.ping}ms`);
-    }
+  if (command === "scan" || command === "usersearch") {
 
-    /* AVATAR */
+    if (!args[0])
+      return message.reply("Provide username.");
 
-    if (command === "avatar") {
+    const u = args[0];
 
-        let user = message.mentions.users.first()
-            || await client.users.fetch(args[0]).catch(() => message.author);
+    const sites = [
+      `https://github.com/${u}`,
+      `https://twitter.com/${u}`,
+      `https://reddit.com/u/${u}`,
+      `https://instagram.com/${u}`,
+      `https://twitch.tv/${u}`,
+      `https://youtube.com/@${u}`,
+      `https://tiktok.com/@${u}`,
+      `https://pinterest.com/${u}`,
+      `https://soundcloud.com/${u}`,
+      `https://medium.com/@${u}`,
+      `https://steamcommunity.com/id/${u}`,
+      `https://dev.to/${u}`
+    ];
 
-        const embed = new EmbedBuilder()
-            .setTitle("🖼️ AVATAR")
-            .setImage(user.displayAvatarURL({ size: 1024 }))
-            .setColor("Blue");
+    const embed = new EmbedBuilder()
+    .setTitle("Username OSINT Scan")
+    .setDescription(sites.join("\n"))
+    .setColor("Orange");
 
-        return message.reply({ embeds: [embed] });
-    }
+    return message.reply({ embeds:[embed] });
+  }
 
-    /* USERINFO */
+  /* OFFLINE AI */
 
-    if (command === "userinfo") {
+  if (command === "ask") {
 
-        let user = message.mentions.users.first()
-            || await client.users.fetch(args[0]).catch(() => message.author);
+    const question = args.join(" ");
 
-        const member = message.guild?.members.cache.get(user.id);
+    if (!question)
+      return message.reply("Ask something, Lord Optic.");
 
-        const embed = new EmbedBuilder()
-            .setTitle("👤 USER INTEL REPORT")
-            .setColor("Purple")
-            .setThumbnail(user.displayAvatarURL())
-            .addFields(
-                { name: "Username", value: user.tag },
-                { name: "User ID", value: user.id },
-                { name: "Bot", value: user.bot ? "Yes" : "No" },
-                { name: "Created", value: moment(user.createdAt).format("LLLL") }
-            );
+    const response = aiResponse(question);
 
-        if (member) {
-            embed.addFields({
-                name: "Server Joined",
-                value: moment(member.joinedAt).format("LLLL")
-            });
-        }
+    return message.reply(response);
+  }
 
-        return message.reply({ embeds: [embed] });
-    }
+  /* TEAM SYSTEM */
 
-    /* SERVERINFO */
+  if (command === "grant") {
 
-    if (command === "serverinfo") {
+    if (message.author.id !== OWNER_ID)
+      return message.reply("Owner only.");
 
-        const guild = message.guild;
+    const user = message.mentions.users.first();
 
-        const embed = new EmbedBuilder()
-            .setTitle("🏰 SERVER INTEL REPORT")
-            .setColor("Gold")
-            .addFields(
-                { name: "Server Name", value: guild.name },
-                { name: "Members", value: guild.memberCount.toString() },
-                { name: "Owner ID", value: guild.ownerId },
-                { name: "Created", value: moment(guild.createdAt).format("LLLL") }
-            );
+    TEAM.push(user.id);
 
-        return message.reply({ embeds: [embed] });
-    }
+    return message.reply(`${user.tag} added to the team.`);
+  }
 
-    /* OSINT */
+  if (command === "revoke") {
 
-    if (command === "osint") {
+    if (message.author.id !== OWNER_ID)
+      return message.reply("Owner only.");
 
-        const embed = new EmbedBuilder()
-            .setTitle("🌐 OSINT GATEWAY")
-            .setColor("Gold")
-            .addFields(
-                { name: "Username Search", value: "https://namechk.com" },
-                { name: "Email Search", value: "https://epieos.com" },
-                { name: "Social Search", value: "https://whatsmyname.app" }
-            );
+    const user = message.mentions.users.first();
 
-        return message.reply({ embeds: [embed] });
-    }
+    TEAM = TEAM.filter(id => id !== user.id);
 
-    /* DISCORD LOOKUP */
+    return message.reply(`${user.tag} removed.`);
+  }
 
-    if (command === "dlookup") {
+  if (command === "team") {
 
-        try {
+    const list = TEAM.map(id => `<@${id}>`).join("\n");
 
-            let user;
+    const embed = new EmbedBuilder()
+    .setTitle("Bot Team")
+    .setDescription(list);
 
-            if (message.mentions.users.first()) {
-                user = message.mentions.users.first();
-            } else if (args[0]) {
-                user = await client.users.fetch(args[0]);
-            } else return message.reply("Provide user.");
-
-            const member = message.guild?.members.cache.get(user.id);
-
-            const embed = new EmbedBuilder()
-                .setTitle("🧠 DISCORD DOSSIER")
-                .setColor("DarkRed")
-                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                .addFields(
-                    { name: "Username", value: user.tag },
-                    { name: "User ID", value: user.id },
-                    { name: "Created", value: moment(user.createdAt).format("LLLL") },
-                    { name: "Server Joined", value: member ? moment(member.joinedAt).format("LLLL") : "Not in server" },
-                    { name: "Profile", value: `https://discord.com/users/${user.id}` }
-                );
-
-            return message.reply({ embeds: [embed] });
-
-        } catch {
-            return message.reply("Lookup failed.");
-        }
-    }
-
-    /* ROBLOX LOOKUP */
-
-    if (command === "rlookup") {
-
-        if (!args[0]) return message.reply("Provide username.");
-
-        try {
-
-            const userRes = await axios.post(
-                "https://users.roblox.com/v1/usernames/users",
-                { usernames: [args[0]] }
-            );
-
-            const robloxUser = userRes.data.data[0];
-            if (!robloxUser) return message.reply("User not found.");
-
-            const infoRes = await axios.get(
-                `https://users.roblox.com/v1/users/${robloxUser.id}`
-            );
-
-            const avatarRes = await axios.get(
-                `https://thumbnails.roblox.com/v1/users/avatar?userIds=${robloxUser.id}&size=420x420&format=Png`
-            );
-
-            const avatar = avatarRes.data.data[0].imageUrl;
-
-            const embed = new EmbedBuilder()
-                .setTitle("🎮 ROBLOX DOSSIER")
-                .setColor("Blue")
-                .setThumbnail(avatar)
-                .addFields(
-                    { name: "Username", value: infoRes.data.name },
-                    { name: "Display Name", value: infoRes.data.displayName },
-                    { name: "User ID", value: infoRes.data.id.toString() },
-                    { name: "Bio", value: infoRes.data.description || "No bio" },
-                    { name: "Profile", value: `https://www.roblox.com/users/${robloxUser.id}/profile` },
-                    { name: "Created", value: moment(infoRes.data.created).format("LLLL") }
-                );
-
-            return message.reply({ embeds: [embed] });
-
-        } catch {
-            return message.reply("Roblox lookup failed.");
-        }
-    }
+    return message.reply({ embeds:[embed] });
+  }
 
 });
 
-client.login(TOKEN);
+client.login(process.env.TOKEN);
