@@ -10,8 +10,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.DirectMessages,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.DirectMessages,
     GatewayIntentBits.MessageContent
   ]
 });
@@ -20,270 +20,275 @@ client.once("clientReady", () => {
   console.log(`Online → ${client.user.tag}`);
 });
 
-/* SIMPLE OFFLINE AI */
+/* SIMPLE AI */
 
-function aiResponse(question) {
+function aiResponse(msg){
 
-  question = question.toLowerCase();
+msg = msg.toLowerCase();
 
-  if (question.includes("hello") || question.includes("hi"))
-    return "Greetings Lord Optic. How may I assist you today?";
+if(msg.includes("hello") || msg.includes("hi"))
+return "Greetings Lord Optic.";
 
-  if (question.includes("commands"))
-    return "Lord Optic, use !help to see all available commands.";
+if(msg.includes("commands"))
+return "Lord Optic, use !help to see my commands.";
 
-  if (question.includes("who are you"))
-    return "I am your intelligence assistant bot, Lord Optic.";
+if(msg.includes("who are you"))
+return "I am your intelligence assistant bot, Lord Optic.";
 
-  if (question.includes("roblox"))
-    return "Lord Optic, you can lookup Roblox users using !rlookup username.";
+if(msg.includes("help"))
+return "Lord Optic, try !help.";
 
-  return "Lord Optic, I am still learning. Try using !help to explore my commands.";
+return "Understood Lord Optic.";
 }
 
 client.on("messageCreate", async (message) => {
 
-  if (message.author.bot) return;
-  if (!message.content.startsWith(PREFIX)) return;
+if(message.author.bot) return;
 
-  const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
+/* AUTO AI (DM OR MENTION) */
 
-  /* HELP */
+if(
+message.channel.type === 1 ||
+message.mentions.has(client.user)
+){
 
-  if (command === "help") {
+if(!message.content.startsWith(PREFIX)){
 
-    const embed = new EmbedBuilder()
-    .setTitle("Intelligence Bot Commands")
-    .setColor("Red")
-    .setDescription(`
+const reply = aiResponse(message.content);
+return message.reply(reply);
+
+}
+
+}
+
+/* COMMAND SYSTEM */
+
+if(!message.content.startsWith(PREFIX)) return;
+
+const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+const command = args.shift().toLowerCase();
+
+/* HELP */
+
+if(command === "help"){
+
+const embed = new EmbedBuilder()
+
+.setTitle("🧠 Intelligence Bot")
+
+.setDescription(`
 !help → command list
 
 !ping → latency
 !botinfo → bot stats
 
-!avatar [user]
-!banner [user]
+!avatar
+!banner
 
-!dlookup [user/id]
-!rlookup [username]
+!dlookup
+!rlookup
 
-!usersearch [username]
-!scan [username]
+!scan
+!usersearch
 
-!ask [question]
+!ask
+`)
 
-!grant @user
-!revoke @user
-!team
-`);
+.setColor("Red");
 
-    return message.reply({ embeds: [embed] });
-  }
+return message.reply({embeds:[embed]});
+}
 
-  /* PING */
+/* PING */
 
-  if (command === "ping")
-    return message.reply(`Pong: ${client.ws.ping}ms`);
+if(command === "ping"){
+return message.reply(`Pong ${client.ws.ping}ms`);
+}
 
-  /* BOT INFO */
+/* BOT INFO */
 
-  if (command === "botinfo") {
+if(command === "botinfo"){
 
-    const embed = new EmbedBuilder()
-    .setTitle("Bot Info")
-    .addFields(
-      { name: "Servers", value: `${client.guilds.cache.size}`, inline: true },
-      { name: "Users", value: `${client.users.cache.size}`, inline: true },
-      { name: "Ping", value: `${client.ws.ping}ms`, inline: true }
-    );
+const embed = new EmbedBuilder()
 
-    return message.reply({ embeds: [embed] });
-  }
+.setTitle("Bot Statistics")
 
-  /* AVATAR */
+.addFields(
+{name:"Servers",value:`${client.guilds.cache.size}`,inline:true},
+{name:"Users",value:`${client.users.cache.size}`,inline:true},
+{name:"Ping",value:`${client.ws.ping}ms`,inline:true}
+)
 
-  if (command === "avatar") {
+.setColor("Blue");
 
-    const user = message.mentions.users.first() || message.author;
+return message.reply({embeds:[embed]});
+}
 
-    const embed = new EmbedBuilder()
-    .setTitle(`${user.username}'s Avatar`)
-    .setImage(user.displayAvatarURL({ size: 1024 }));
+/* AVATAR */
 
-    return message.reply({ embeds: [embed] });
-  }
+if(command === "avatar"){
 
-  /* BANNER */
+const user = message.mentions.users.first() || message.author;
 
-  if (command === "banner") {
+const embed = new EmbedBuilder()
 
-    const user = message.mentions.users.first() || message.author;
+.setTitle(`${user.username}'s Avatar`)
 
-    const fetched = await client.users.fetch(user.id, { force: true });
+.setImage(user.displayAvatarURL({size:1024}));
 
-    if (!fetched.banner)
-      return message.reply("No banner found.");
+return message.reply({embeds:[embed]});
+}
 
-    const embed = new EmbedBuilder()
-    .setTitle(`${fetched.username}'s Banner`)
-    .setImage(fetched.bannerURL({ size: 1024 }));
+/* BANNER */
 
-    return message.reply({ embeds: [embed] });
-  }
+if(command === "banner"){
 
-  /* DISCORD LOOKUP */
+const user = message.mentions.users.first() || message.author;
 
-  if (command === "dlookup") {
+const fetched = await client.users.fetch(user.id,{force:true});
 
-    let user;
+if(!fetched.banner)
+return message.reply("No banner found.");
 
-    if (message.mentions.users.first())
-      user = message.mentions.users.first();
-    else if (args[0])
-      user = await client.users.fetch(args[0]).catch(() => null);
-    else
-      user = message.author;
+const embed = new EmbedBuilder()
 
-    if (!user)
-      return message.reply("User not found.");
+.setTitle(`${fetched.username}'s Banner`)
 
-    const embed = new EmbedBuilder()
-    .setTitle("Discord Lookup")
-    .setThumbnail(user.displayAvatarURL())
-    .addFields(
-      { name: "Username", value: user.tag, inline: true },
-      { name: "ID", value: user.id, inline: true },
-      { name: "Bot", value: `${user.bot}`, inline: true },
-      { name: "Created", value: `<t:${Math.floor(user.createdTimestamp/1000)}:R>`, inline: true }
-    );
+.setImage(fetched.bannerURL({size:1024}));
 
-    return message.reply({ embeds: [embed] });
-  }
+return message.reply({embeds:[embed]});
+}
 
-  /* ROBLOX LOOKUP */
+/* DISCORD LOOKUP */
 
-  if (command === "rlookup") {
+if(command === "dlookup"){
 
-    if (!args[0])
-      return message.reply("Provide a Roblox username.");
+let user;
 
-    try {
+if(message.mentions.users.first())
+user = message.mentions.users.first();
 
-      const res = await axios.post(
-        "https://users.roblox.com/v1/usernames/users",
-        { usernames:[args[0]] }
-      );
+else if(args[0])
+user = await client.users.fetch(args[0]).catch(()=>null);
 
-      const user = res.data.data[0];
+else
+user = message.author;
 
-      if (!user)
-        return message.reply("User not found.");
+if(!user)
+return message.reply("User not found.");
 
-      const avatar = await axios.get(
-        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png`
-      );
+const embed = new EmbedBuilder()
 
-      const embed = new EmbedBuilder()
-      .setTitle("Roblox Lookup")
-      .setThumbnail(avatar.data.data[0].imageUrl)
-      .addFields(
-        { name:"Username", value:user.name, inline:true },
-        { name:"Display Name", value:user.displayName, inline:true },
-        { name:"User ID", value:`${user.id}`, inline:true }
-      );
+.setTitle("Discord User Lookup")
 
-      return message.reply({ embeds:[embed] });
+.setThumbnail(user.displayAvatarURL())
 
-    } catch {
+.addFields(
+{name:"Username",value:user.tag,inline:true},
+{name:"User ID",value:user.id,inline:true},
+{name:"Bot",value:`${user.bot}`,inline:true},
+{name:"Created",value:`<t:${Math.floor(user.createdTimestamp/1000)}:R>`,inline:true}
+)
 
-      return message.reply("Roblox lookup failed.");
+.setColor("Purple");
 
-    }
-  }
+return message.reply({embeds:[embed]});
+}
 
-  /* USERNAME SCAN */
+/* ROBLOX LOOKUP */
 
-  if (command === "scan" || command === "usersearch") {
+if(command === "rlookup"){
 
-    if (!args[0])
-      return message.reply("Provide username.");
+if(!args[0])
+return message.reply("Provide Roblox username.");
 
-    const u = args[0];
+try{
 
-    const sites = [
-      `https://github.com/${u}`,
-      `https://twitter.com/${u}`,
-      `https://reddit.com/u/${u}`,
-      `https://instagram.com/${u}`,
-      `https://twitch.tv/${u}`,
-      `https://youtube.com/@${u}`,
-      `https://tiktok.com/@${u}`,
-      `https://pinterest.com/${u}`,
-      `https://soundcloud.com/${u}`,
-      `https://medium.com/@${u}`,
-      `https://steamcommunity.com/id/${u}`,
-      `https://dev.to/${u}`
-    ];
+const res = await axios.post(
+"https://users.roblox.com/v1/usernames/users",
+{usernames:[args[0]]}
+);
 
-    const embed = new EmbedBuilder()
-    .setTitle("Username OSINT Scan")
-    .setDescription(sites.join("\n"))
-    .setColor("Orange");
+const user = res.data.data[0];
 
-    return message.reply({ embeds:[embed] });
-  }
+if(!user)
+return message.reply("User not found.");
 
-  /* OFFLINE AI */
+const avatar = await axios.get(
+`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png`
+);
 
-  if (command === "ask") {
+const embed = new EmbedBuilder()
 
-    const question = args.join(" ");
+.setTitle("Roblox Profile")
 
-    if (!question)
-      return message.reply("Ask something, Lord Optic.");
+.setURL(`https://www.roblox.com/users/${user.id}/profile`)
 
-    const response = aiResponse(question);
+.setThumbnail(avatar.data.data[0].imageUrl)
 
-    return message.reply(response);
-  }
+.addFields(
+{name:"Username",value:user.name,inline:true},
+{name:"Display Name",value:user.displayName,inline:true},
+{name:"User ID",value:`${user.id}`,inline:true}
+)
 
-  /* TEAM SYSTEM */
+.setColor("Green");
 
-  if (command === "grant") {
+return message.reply({embeds:[embed]});
 
-    if (message.author.id !== OWNER_ID)
-      return message.reply("Owner only.");
+}catch{
 
-    const user = message.mentions.users.first();
+return message.reply("Roblox lookup failed.");
 
-    TEAM.push(user.id);
+}
 
-    return message.reply(`${user.tag} added to the team.`);
-  }
+}
 
-  if (command === "revoke") {
+/* USERNAME SCAN */
 
-    if (message.author.id !== OWNER_ID)
-      return message.reply("Owner only.");
+if(command === "scan" || command === "usersearch"){
 
-    const user = message.mentions.users.first();
+if(!args[0])
+return message.reply("Provide username.");
 
-    TEAM = TEAM.filter(id => id !== user.id);
+const u = args[0];
 
-    return message.reply(`${user.tag} removed.`);
-  }
+const sites = [
 
-  if (command === "team") {
+`https://github.com/${u}`,
+`https://twitter.com/${u}`,
+`https://reddit.com/u/${u}`,
+`https://instagram.com/${u}`,
+`https://twitch.tv/${u}`,
+`https://youtube.com/@${u}`,
+`https://tiktok.com/@${u}`,
+`https://pinterest.com/${u}`,
+`https://soundcloud.com/${u}`
 
-    const list = TEAM.map(id => `<@${id}>`).join("\n");
+];
 
-    const embed = new EmbedBuilder()
-    .setTitle("Bot Team")
-    .setDescription(list);
+const embed = new EmbedBuilder()
 
-    return message.reply({ embeds:[embed] });
-  }
+.setTitle("Username OSINT Scan")
+
+.setDescription(sites.join("\n"))
+
+.setColor("Orange");
+
+return message.reply({embeds:[embed]});
+}
+
+/* AI COMMAND */
+
+if(command === "ask"){
+
+const question = args.join(" ");
+
+if(!question)
+return message.reply("Ask something Lord Optic.");
+
+return message.reply(aiResponse(question));
+}
 
 });
 
