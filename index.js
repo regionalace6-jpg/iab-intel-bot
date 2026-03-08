@@ -1,343 +1,230 @@
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
-const axios = require("axios");
+const fetch = require("node-fetch");
 
 const PREFIX = "!";
-const OWNER_ID = process.env.OWNER_ID;
-
-let TEAM = [OWNER_ID];
+const OWNER = process.env.OWNER_ID;
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.MessageContent
-  ]
+intents: [
+GatewayIntentBits.Guilds,
+GatewayIntentBits.GuildMessages,
+GatewayIntentBits.MessageContent,
+GatewayIntentBits.DirectMessages
+]
 });
 
-client.once("clientReady", () => {
-  console.log(`Online → ${client.user.tag}`);
+client.once("ready", () => {
+console.log(`Online as ${client.user.tag}`);
 });
-
-/* SIMPLE OFFLINE AI */
-
-function aiResponse(msg) {
-
-msg = msg.toLowerCase();
-
-if(msg.includes("hello") || msg.includes("hi"))
-return "Greetings Lord Optic. How may I assist you?";
-
-if(msg.includes("commands"))
-return "Lord Optic, use **!help** to see my command list.";
-
-if(msg.includes("who are you"))
-return "I am your intelligence assistant bot, Lord Optic.";
-
-if(msg.includes("roblox"))
-return "Lord Optic, use **!rlookup username** to inspect a Roblox account.";
-
-return "Understood, Lord Optic.";
-}
 
 client.on("messageCreate", async (message) => {
 
-if(message.author.bot) return;
+if (message.author.bot) return;
 
-/* AUTO REPLY IF DM OR MENTION */
+const mention = `<@${client.user.id}>`;
 
-if(
-message.channel.type === 1 ||
-message.mentions.has(client.user)
-){
-if(!message.content.startsWith(PREFIX)){
-return message.reply(aiResponse(message.content));
-}
+if (message.channel.type === 1 || message.content.includes(mention)) {
+message.reply(`Yes **Lord Optic**. I am operational.`);
 }
 
-/* COMMAND SYSTEM */
-
-if(!message.content.startsWith(PREFIX)) return;
+if (!message.content.startsWith(PREFIX)) return;
 
 const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-const command = args.shift().toLowerCase();
+const cmd = args.shift().toLowerCase();
 
-/* HELP */
-
-if(command === "help"){
+if (cmd === "help") {
 
 const embed = new EmbedBuilder()
-
-.setTitle("🧠 Intelligence Bot Command List")
-
-.setColor("Red")
-
+.setTitle("INTELLIGENCE COMMAND CENTER")
+.setColor("Purple")
 .setDescription(`
-**Core**
-!help → show command list  
-!ping → bot latency  
-!botinfo → bot statistics  
+!help → show commands
 
-**Profile Tools**
-!avatar [@user] → view avatar  
-!banner [@user] → view banner  
+!dlookup <user/id> → discord intelligence
 
-**Intelligence**
-!dlookup [@user/id] → Discord account lookup  
-!rlookup [username] → Roblox profile lookup  
+!rlookup <username> → roblox intelligence
 
-**OSINT**
-!scan [username] → scan username across sites  
+!osint <username> → username search
 
-**AI**
-!ask [question] → talk to bot  
+!ip <ip> → ip intelligence
 
-**Admin**
-!grant @user → add team member  
-!revoke @user → remove team member  
-!team → show team list
+!userinfo → user info
+
+!serverinfo → server info
+
+!botinfo → bot details
+
+!ping → latency
 `);
 
-return message.reply({embeds:[embed]});
+message.reply({embeds:[embed]});
 }
 
-/* PING */
-
-if(command === "ping"){
-return message.reply(`🏓 Pong → ${client.ws.ping}ms`);
+if (cmd === "ping") {
+message.reply(`Latency: ${client.ws.ping}ms`);
 }
 
-/* BOT INFO */
-
-if(command === "botinfo"){
+if (cmd === "botinfo") {
 
 const embed = new EmbedBuilder()
-
-.setTitle("Bot Statistics")
-
+.setTitle("BOT SYSTEM")
 .setColor("Blue")
+.setDescription(`Personal Intelligence AI for **Lord Optic**`);
 
+message.reply({embeds:[embed]});
+}
+
+if (cmd === "serverinfo" && message.guild) {
+
+const g = message.guild;
+
+const embed = new EmbedBuilder()
+.setTitle("SERVER INTELLIGENCE")
+.setColor("Green")
 .addFields(
-{name:"Servers",value:`${client.guilds.cache.size}`,inline:true},
-{name:"Users",value:`${client.users.cache.size}`,inline:true},
-{name:"Ping",value:`${client.ws.ping}ms`,inline:true}
+{name:"Server", value:g.name},
+{name:"Members", value:String(g.memberCount)},
+{name:"Created", value:`<t:${parseInt(g.createdTimestamp/1000)}:R>`}
+)
+.setThumbnail(g.iconURL());
+
+message.reply({embeds:[embed]});
+}
+
+if (cmd === "userinfo") {
+
+const user = message.mentions.users.first() || message.author;
+
+const embed = new EmbedBuilder()
+.setTitle("USER INTELLIGENCE")
+.setColor("Yellow")
+.setThumbnail(user.displayAvatarURL({dynamic:true}))
+.addFields(
+{name:"Username", value:user.tag},
+{name:"ID", value:user.id},
+{name:"Bot", value:String(user.bot)},
+{name:"Created", value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
 );
 
-return message.reply({embeds:[embed]});
+message.reply({embeds:[embed]});
 }
 
-/* AVATAR */
-
-if(command === "avatar"){
-
-const user = message.mentions.users.first() || message.author;
-
-const embed = new EmbedBuilder()
-
-.setTitle(`${user.username}'s Avatar`)
-
-.setImage(user.displayAvatarURL({size:1024}))
-
-.setColor("Purple");
-
-return message.reply({embeds:[embed]});
-}
-
-/* BANNER */
-
-if(command === "banner"){
-
-const user = message.mentions.users.first() || message.author;
-
-const fetched = await client.users.fetch(user.id,{force:true});
-
-if(!fetched.banner)
-return message.reply("No banner found.");
-
-const embed = new EmbedBuilder()
-
-.setTitle(`${fetched.username}'s Banner`)
-
-.setImage(fetched.bannerURL({size:1024}));
-
-return message.reply({embeds:[embed]});
-}
-
-/* DISCORD LOOKUP */
-
-if(command === "dlookup"){
+if (cmd === "dlookup") {
 
 let user;
 
-if(message.mentions.users.first())
+if (message.mentions.users.first()) {
 user = message.mentions.users.first();
-
-else if(args[0])
+} else {
 user = await client.users.fetch(args[0]).catch(()=>null);
+}
 
-else
-user = message.author;
-
-if(!user)
-return message.reply("User not found.");
+if (!user) return message.reply("User not found.");
 
 const embed = new EmbedBuilder()
-
-.setTitle("🔎 Discord User Lookup")
-
-.setThumbnail(user.displayAvatarURL())
-
-.setColor("Purple")
-
+.setTitle("DISCORD LOOKUP")
+.setColor("Blurple")
+.setThumbnail(user.displayAvatarURL({dynamic:true}))
 .addFields(
-{name:"Username",value:user.tag,inline:true},
-{name:"User ID",value:user.id,inline:true},
-{name:"Bot",value:`${user.bot}`,inline:true},
-{name:"Account Created",value:`<t:${Math.floor(user.createdTimestamp/1000)}:R>`,inline:true}
-);
+{name:"Username", value:user.tag},
+{name:"ID", value:user.id},
+{name:"Bot", value:String(user.bot)},
+{name:"Created", value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
+)
+.setURL(`https://discord.com/users/${user.id}`);
 
-return message.reply({embeds:[embed]});
+message.reply({embeds:[embed]});
 }
 
-/* ROBLOX LOOKUP */
+if (cmd === "rlookup") {
 
-if(command === "rlookup"){
+const username = args[0];
+if (!username) return message.reply("Provide username.");
 
-if(!args[0])
-return message.reply("Provide a Roblox username.");
+try {
 
-try{
+const res = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`);
+const data = await res.json();
 
-const res = await axios.post(
-"https://users.roblox.com/v1/usernames/users",
-{usernames:[args[0]]}
-);
+if (!data.Id) return message.reply("User not found.");
 
-const user = res.data.data[0];
-
-if(!user)
-return message.reply("User not found.");
-
-const avatar = await axios.get(
-`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=420x420&format=Png`
-);
+const user = await fetch(`https://users.roblox.com/v1/users/${data.Id}`);
+const u = await user.json();
 
 const embed = new EmbedBuilder()
-
-.setTitle("🎮 Roblox Profile")
-
-.setURL(`https://www.roblox.com/users/${user.id}/profile`)
-
-.setThumbnail(avatar.data.data[0].imageUrl)
-
-.setColor("Green")
-
+.setTitle("ROBLOX LOOKUP")
+.setColor("Red")
 .addFields(
-{name:"Username",value:user.name,inline:true},
-{name:"Display Name",value:user.displayName,inline:true},
-{name:"User ID",value:`${user.id}`,inline:true}
-);
+{name:"Username", value:u.name},
+{name:"Display Name", value:u.displayName},
+{name:"ID", value:String(u.id)},
+{name:"Created", value:u.created}
+)
+.setURL(`https://roblox.com/users/${u.id}/profile`);
 
-return message.reply({embeds:[embed]});
+message.reply({embeds:[embed]});
 
-}catch{
-
-return message.reply("Roblox lookup failed.");
-
+} catch {
+message.reply("Lookup failed.");
+}
 }
 
-}
+if (cmd === "ip") {
 
-/* USERNAME SCAN */
+const ip = args[0];
+if (!ip) return message.reply("Provide IP.");
 
-if(command === "scan"){
+try {
 
-if(!args[0])
-return message.reply("Provide username.");
+const res = await fetch(`http://ip-api.com/json/${ip}`);
+const data = await res.json();
 
-const u = args[0];
-
-const sites=[
-
-`https://github.com/${u}`,
-`https://twitter.com/${u}`,
-`https://reddit.com/u/${u}`,
-`https://instagram.com/${u}`,
-`https://twitch.tv/${u}`,
-`https://youtube.com/@${u}`,
-`https://tiktok.com/@${u}`,
-`https://pinterest.com/${u}`,
-`https://soundcloud.com/${u}`,
-`https://steamcommunity.com/id/${u}`
-
-];
-
-const embed=new EmbedBuilder()
-
-.setTitle("🌐 Username OSINT Scan")
-
+const embed = new EmbedBuilder()
+.setTitle("IP INTELLIGENCE")
 .setColor("Orange")
+.addFields(
+{name:"Country", value:data.country || "Unknown"},
+{name:"Region", value:data.regionName || "Unknown"},
+{name:"City", value:data.city || "Unknown"},
+{name:"ISP", value:data.isp || "Unknown"}
+);
 
-.setDescription(sites.join("\n"));
+message.reply({embeds:[embed]});
 
-return message.reply({embeds:[embed]});
+} catch {
+message.reply("IP lookup failed.");
+}
 }
 
-/* ASK */
+if (cmd === "osint") {
 
-if(command === "ask"){
+const username = args[0];
+if (!username) return message.reply("Provide username.");
 
-const question=args.join(" ");
+const embed = new EmbedBuilder()
+.setTitle("USERNAME OSINT SCAN")
+.setColor("DarkPurple")
+.setDescription(`
+GitHub → https://github.com/${username}
 
-if(!question)
-return message.reply("Ask something, Lord Optic.");
+Reddit → https://reddit.com/user/${username}
 
-return message.reply(aiResponse(question));
-}
+Instagram → https://instagram.com/${username}
 
-/* TEAM SYSTEM */
+TikTok → https://tiktok.com/@${username}
 
-if(command === "grant"){
+X → https://x.com/${username}
 
-if(message.author.id!==OWNER_ID)
-return message.reply("Owner only.");
+YouTube → https://youtube.com/@${username}
 
-const user=message.mentions.users.first();
+Twitch → https://twitch.tv/${username}
 
-if(!user)
-return message.reply("Mention a user.");
+Steam → https://steamcommunity.com/id/${username}
 
-TEAM.push(user.id);
+Roblox → https://roblox.com/users/profile?username=${username}
+`);
 
-return message.reply(`${user.tag} added to the team.`);
-}
-
-if(command === "revoke"){
-
-if(message.author.id!==OWNER_ID)
-return message.reply("Owner only.");
-
-const user=message.mentions.users.first();
-
-TEAM=TEAM.filter(id=>id!==user.id);
-
-return message.reply(`${user.tag} removed from team.`);
-}
-
-if(command==="team"){
-
-const list=TEAM.map(id=>`<@${id}>`).join("\n");
-
-const embed=new EmbedBuilder()
-
-.setTitle("👑 Bot Team")
-
-.setColor("Yellow")
-
-.setDescription(list);
-
-return message.reply({embeds:[embed]});
+message.reply({embeds:[embed]});
 }
 
 });
