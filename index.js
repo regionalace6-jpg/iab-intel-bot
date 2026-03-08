@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js");
 const fetch = require("node-fetch");
 
 const PREFIX = "!";
@@ -15,6 +15,10 @@ GatewayIntentBits.DirectMessages
 
 client.once("ready", () => {
 console.log(`Online as ${client.user.tag}`);
+
+client.user.setActivity("Serving Lord Optic", {
+type: ActivityType.Playing
+});
 });
 
 client.on("messageCreate", async (message) => {
@@ -23,8 +27,12 @@ if (message.author.bot) return;
 
 const mention = `<@${client.user.id}>`;
 
-if (message.channel.type === 1 || message.content.includes(mention)) {
-message.reply(`Yes **Lord Optic**. I am operational.`);
+if (message.content.includes(mention) || message.channel.type === 1) {
+message.reply("Yes Lord Optic. I am ready.");
+}
+
+if (message.content.toLowerCase().includes("hello bot")) {
+message.reply("Greetings. Awaiting orders from Lord Optic.");
 }
 
 if (!message.content.startsWith(PREFIX)) return;
@@ -38,23 +46,23 @@ const embed = new EmbedBuilder()
 .setTitle("INTELLIGENCE COMMAND CENTER")
 .setColor("Purple")
 .setDescription(`
-!help → show commands
+!help → show command list
 
-!dlookup <user/id> → discord intelligence
+!dlookup <user/id> → discord intelligence lookup
 
-!rlookup <username> → roblox intelligence
+!rlookup <username> → roblox profile lookup
 
-!osint <username> → username search
+!osint <username> → username OSINT scan
 
-!ip <ip> → ip intelligence
+!ip <ip> → ip intelligence lookup
 
-!userinfo → user info
+!userinfo → show user information
 
-!serverinfo → server info
+!serverinfo → server information
 
-!botinfo → bot details
+!botinfo → bot system details
 
-!ping → latency
+!ping → bot latency
 `);
 
 message.reply({embeds:[embed]});
@@ -69,24 +77,7 @@ if (cmd === "botinfo") {
 const embed = new EmbedBuilder()
 .setTitle("BOT SYSTEM")
 .setColor("Blue")
-.setDescription(`Personal Intelligence AI for **Lord Optic**`);
-
-message.reply({embeds:[embed]});
-}
-
-if (cmd === "serverinfo" && message.guild) {
-
-const g = message.guild;
-
-const embed = new EmbedBuilder()
-.setTitle("SERVER INTELLIGENCE")
-.setColor("Green")
-.addFields(
-{name:"Server", value:g.name},
-{name:"Members", value:String(g.memberCount)},
-{name:"Created", value:`<t:${parseInt(g.createdTimestamp/1000)}:R>`}
-)
-.setThumbnail(g.iconURL());
+.setDescription("Personal Intelligence System for **Lord Optic**");
 
 message.reply({embeds:[embed]});
 }
@@ -97,13 +88,28 @@ const user = message.mentions.users.first() || message.author;
 
 const embed = new EmbedBuilder()
 .setTitle("USER INTELLIGENCE")
-.setColor("Yellow")
 .setThumbnail(user.displayAvatarURL({dynamic:true}))
 .addFields(
 {name:"Username", value:user.tag},
 {name:"ID", value:user.id},
 {name:"Bot", value:String(user.bot)},
 {name:"Created", value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
+);
+
+message.reply({embeds:[embed]});
+}
+
+if (cmd === "serverinfo" && message.guild) {
+
+const g = message.guild;
+
+const embed = new EmbedBuilder()
+.setTitle("SERVER INTELLIGENCE")
+.setThumbnail(g.iconURL())
+.addFields(
+{name:"Server", value:g.name},
+{name:"Members", value:String(g.memberCount)},
+{name:"Created", value:`<t:${parseInt(g.createdTimestamp/1000)}:R>`}
 );
 
 message.reply({embeds:[embed]});
@@ -123,7 +129,6 @@ if (!user) return message.reply("User not found.");
 
 const embed = new EmbedBuilder()
 .setTitle("DISCORD LOOKUP")
-.setColor("Blurple")
 .setThumbnail(user.displayAvatarURL({dynamic:true}))
 .addFields(
 {name:"Username", value:user.tag},
@@ -153,7 +158,6 @@ const u = await user.json();
 
 const embed = new EmbedBuilder()
 .setTitle("ROBLOX LOOKUP")
-.setColor("Red")
 .addFields(
 {name:"Username", value:u.name},
 {name:"Display Name", value:u.displayName},
@@ -165,7 +169,7 @@ const embed = new EmbedBuilder()
 message.reply({embeds:[embed]});
 
 } catch {
-message.reply("Lookup failed.");
+message.reply("Roblox lookup failed.");
 }
 }
 
@@ -181,7 +185,6 @@ const data = await res.json();
 
 const embed = new EmbedBuilder()
 .setTitle("IP INTELLIGENCE")
-.setColor("Orange")
 .addFields(
 {name:"Country", value:data.country || "Unknown"},
 {name:"Region", value:data.regionName || "Unknown"},
@@ -203,7 +206,6 @@ if (!username) return message.reply("Provide username.");
 
 const embed = new EmbedBuilder()
 .setTitle("USERNAME OSINT SCAN")
-.setColor("DarkPurple")
 .setDescription(`
 GitHub → https://github.com/${username}
 
@@ -225,6 +227,20 @@ Roblox → https://roblox.com/users/profile?username=${username}
 `);
 
 message.reply({embeds:[embed]});
+}
+
+if (cmd === "status" && message.author.id === OWNER) {
+
+const text = args.join(" ");
+
+client.user.setActivity(text, {type: ActivityType.Playing});
+
+message.reply("Status updated.");
+}
+
+if (cmd === "say" && message.author.id === OWNER) {
+
+message.channel.send(args.join(" "));
 }
 
 });
