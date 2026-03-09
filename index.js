@@ -1,23 +1,49 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js");
 const fetch = require("node-fetch");
-const sqlite3 = require("sqlite3").verbose();
+const { Pool } = require("pg");
 
 const PREFIX = "!";
 const OWNER = process.env.OWNER_ID;
 
-const db = new sqlite3.Database("./data.db");
+const pool = new Pool({
+connectionString: process.env.DATABASE_URL,
+ssl: { rejectUnauthorized: false }
+});
 
-db.run(`CREATE TABLE IF NOT EXISTS grants (user TEXT)`);
-db.run(`CREATE TABLE IF NOT EXISTS notes (text TEXT)`);
-db.run(`CREATE TABLE IF NOT EXISTS tasks (text TEXT)`);
-db.run(`CREATE TABLE IF NOT EXISTS messages (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-user TEXT,
+async function initDB(){
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS grants(
+user_id TEXT PRIMARY KEY
+)
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS notes(
+id SERIAL PRIMARY KEY,
+text TEXT
+)
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS tasks(
+id SERIAL PRIMARY KEY,
+text TEXT
+)
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS messages(
+id SERIAL PRIMARY KEY,
+user_id TEXT,
 username TEXT,
 content TEXT,
-channel TEXT,
-time INTEGER
-)`);
+channel_id TEXT,
+time BIGINT
+)
+`);
+
+}
 
 const client = new Client({
 intents:[
@@ -28,19 +54,23 @@ GatewayIntentBits.DirectMessages
 ]
 });
 
-client.once("ready", ()=>{
+client.once("ready",async ()=>{
 console.log(`Online as ${client.user.tag}`);
 client.user.setActivity("Serving Lord Optic",{type:ActivityType.Playing});
+await initDB();
 });
 
-function isAuthorized(id){
-return new Promise(resolve=>{
-if(id===OWNER) return resolve(true);
+async function isAuthorized(id){
 
-db.get(`SELECT user FROM grants WHERE user=?`,[id],(err,row)=>{
-resolve(!!row);
-});
-});
+if(id === OWNER) return true;
+
+const res = await pool.query(
+`SELECT user_id FROM grants WHERE user_id=$1`,
+[id]
+);
+
+return res.rows.length > 0;
+
 }
 
 client.on("messageCreate",async message=>{
@@ -49,8 +79,9 @@ if(message.author.bot) return;
 
 /* LOG MESSAGE */
 
-db.run(
-`INSERT INTO messages(user,username,content,channel,time) VALUES(?,?,?,?,?)`,
+await pool.query(
+`INSERT INTO messages(user_id,username,content,channel_id,time)
+VALUES($1,$2,$3,$4,$5)`,
 [
 message.author.id,
 message.author.tag,
@@ -60,9 +91,9 @@ Date.now()
 ]
 );
 
-/* LIMIT TO 1000 */
+/* LIMIT 1000 MESSAGES */
 
-db.run(`
+await pool.query(`
 DELETE FROM messages
 WHERE id NOT IN (
 SELECT id FROM messages ORDER BY id DESC LIMIT 1000
@@ -83,6 +114,7 @@ try{
 /* HELP */
 
 if(cmd==="help"){
+
 message.reply(`
 INTELLIGENCE
 !dlookup
@@ -111,180 +143,103 @@ PERMISSIONS
 !revoke
 !granted
 `);
+
 }
 
-/* PING */
+/* GRANT */
 
-if(cmd==="ping"){
-message.reply(`Latency: ${client.ws.ping}ms`);
-}
+if(cmd==="grant" && message.author.id===OWNER){
 
-/* USER INFO */
+const user = message.mentions.users.first();
+if(!user) return message.reply("Mention user.");
 
-if(cmd==="userinfo"){
-
-const user = message.mentions.users.first() || message.author;
-
-const embed = new EmbedBuilder()
-.setTitle("User Intelligence")
-.setThumbnail(user.displayAvatarURL())
-.addFields(
-{name:"Username",value:user.tag},
-{name:"ID",value:user.id},
-{name:"Bot",value:String(user.bot)},
-{name:"Created",value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
+await pool.query(
+`INSERT INTO grants(user_id) VALUES($1) ON CONFLICT DO NOTHING`,
+[user.id]
 );
 
-message.reply({embeds:[embed]});
+message.reply("Access granted.");
+
 }
 
-/* SERVER INFO */
+/* REVOKE */
 
-if(cmd==="serverinfo" && message.guild){
+if(cmd==="revoke" && message.author.id===OWNER){
 
-const g = message.guild;
+const user = message.mentions.users.first();
+if(!user) return message.reply("Mention user.");
 
-const embed = new EmbedBuilder()
-.setTitle("Server Intelligence")
-.addFields(
-{name:"Server",value:g.name},
-{name:"Members",value:String(g.memberCount)},
-{name:"Created",value:`<t:${parseInt(g.createdTimestamp/1000)}:R>`}
+await pool.query(
+`DELETE FROM grants WHERE user_id=$1`,
+[user.id]
 );
 
-message.reply({embeds:[embed]});
+message.reply("Access revoked.");
+
 }
 
-/* DISCORD LOOKUP */
+/* GRANTED LIST */
 
-if(cmd==="dlookup"){
+if(cmd==="granted" && message.author.id===OWNER){
 
-let user;
+const res = await pool.query(`SELECT user_id FROM grants`);
 
-if(message.mentions.users.first()){
-user = message.mentions.users.first();
-}else{
-user = await client.users.fetch(args[0]).catch(()=>null);
+if(!res.rows.length) return message.reply("No users granted.");
+
+message.reply(res.rows.map(r=>`<@${r.user_id}>`).join("\n"));
+
 }
 
-if(!user) return message.reply("User not found.");
-
-const embed = new EmbedBuilder()
-.setTitle("Discord Lookup")
-.setThumbnail(user.displayAvatarURL())
-.addFields(
-{name:"Username",value:user.tag},
-{name:"ID",value:user.id},
-{name:"Bot",value:String(user.bot)},
-{name:"Created",value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
-);
-
-message.reply({embeds:[embed]});
-}
-
-/* ROBLOX LOOKUP */
-
-if(cmd==="rlookup"){
-
-const username=args[0];
-if(!username) return message.reply("Provide username.");
-
-const res = await fetch(`https://users.roblox.com/v1/usernames/users`,{
-method:"POST",
-headers:{ "Content-Type":"application/json"},
-body:JSON.stringify({usernames:[username]})
-});
-
-const data = await res.json();
-
-if(!data.data.length) return message.reply("User not found.");
-
-const id = data.data[0].id;
-
-const userRes = await fetch(`https://users.roblox.com/v1/users/${id}`);
-const user = await userRes.json();
-
-const embed = new EmbedBuilder()
-.setTitle("Roblox Lookup")
-.addFields(
-{name:"Username",value:user.name},
-{name:"Display",value:user.displayName},
-{name:"ID",value:String(user.id)},
-{name:"Created",value:user.created}
-)
-.setURL(`https://roblox.com/users/${user.id}/profile`);
-
-message.reply({embeds:[embed]});
-}
-
-/* OSINT */
-
-if(cmd==="osint"){
-
-const username = args[0];
-if(!username) return message.reply("Provide username.");
-
-message.reply(`
-GitHub → https://github.com/${username}
-Reddit → https://reddit.com/user/${username}
-Instagram → https://instagram.com/${username}
-TikTok → https://tiktok.com/@${username}
-X → https://x.com/${username}
-YouTube → https://youtube.com/@${username}
-Twitch → https://twitch.tv/${username}
-Steam → https://steamcommunity.com/id/${username}
-Roblox → https://roblox.com/users/profile?username=${username}
-`);
-}
-
-/* IP */
-
-if(cmd==="ip"){
-
-const ip = args[0];
-if(!ip) return message.reply("Provide IP.");
-
-const res = await fetch(`http://ip-api.com/json/${ip}`);
-const data = await res.json();
-
-message.reply(`
-Country: ${data.country}
-Region: ${data.regionName}
-City: ${data.city}
-ISP: ${data.isp}
-`);
-}
-
-/* NOTES */
+/* NOTE */
 
 if(cmd==="note"){
 
 if(args[0]==="add"){
-db.run(`INSERT INTO notes(text) VALUES(?)`,[args.slice(1).join(" ")]);
+
+const text = args.slice(1).join(" ");
+
+await pool.query(
+`INSERT INTO notes(text) VALUES($1)`,
+[text]
+);
+
 message.reply("Note saved.");
+
 }
 
 if(args[0]==="list"){
-db.all(`SELECT text FROM notes`,[],(err,rows)=>{
-message.reply(rows.map(r=>r.text).join("\n") || "No notes.");
-});
-}
+
+const res = await pool.query(`SELECT text FROM notes`);
+
+message.reply(res.rows.map(r=>r.text).join("\n") || "No notes.");
 
 }
 
-/* TASKS */
+}
+
+/* TASK */
 
 if(cmd==="task"){
 
 if(args[0]==="add"){
-db.run(`INSERT INTO tasks(text) VALUES(?)`,[args.slice(1).join(" ")]);
+
+const text = args.slice(1).join(" ");
+
+await pool.query(
+`INSERT INTO tasks(text) VALUES($1)`,
+[text]
+);
+
 message.reply("Task added.");
+
 }
 
 if(args[0]==="list"){
-db.all(`SELECT text FROM tasks`,[],(err,rows)=>{
-message.reply(rows.map(r=>r.text).join("\n") || "No tasks.");
-});
+
+const res = await pool.query(`SELECT text FROM tasks`);
+
+message.reply(res.rows.map(r=>r.text).join("\n") || "No tasks.");
+
 }
 
 }
@@ -296,32 +251,41 @@ if(cmd==="history"){
 const user = message.mentions.users.first();
 if(!user) return message.reply("Mention user.");
 
-db.all(
-`SELECT content,time FROM messages WHERE user=? ORDER BY time DESC LIMIT 10`,
-[user.id],
-(err,rows)=>{
+const res = await pool.query(
+`SELECT content,time FROM messages
+WHERE user_id=$1
+ORDER BY time DESC
+LIMIT 10`,
+[user.id]
+);
 
-if(!rows.length) return message.reply("No history.");
+if(!res.rows.length) return message.reply("No history.");
 
-const text = rows.map(r=>`<t:${Math.floor(r.time/1000)}:R> - ${r.content}`).join("\n");
+const text = res.rows.map(r=>
+`<t:${Math.floor(r.time/1000)}:R> - ${r.content}`
+).join("\n");
 
 message.reply(text);
-});
+
 }
 
 /* CHANNEL HISTORY */
 
 if(cmd==="channelhistory"){
 
-db.all(
-`SELECT username,content FROM messages WHERE channel=? ORDER BY time DESC LIMIT 10`,
-[message.channel.id],
-(err,rows)=>{
+const res = await pool.query(
+`SELECT username,content
+FROM messages
+WHERE channel_id=$1
+ORDER BY time DESC
+LIMIT 10`,
+[message.channel.id]
+);
 
-if(!rows.length) return message.reply("No history.");
+if(!res.rows.length) return message.reply("No history.");
 
-message.reply(rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
-});
+message.reply(res.rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
+
 }
 
 /* SEARCH */
@@ -330,56 +294,25 @@ if(cmd==="search"){
 
 const keyword = args.join(" ");
 
-db.all(
-`SELECT username,content FROM messages WHERE content LIKE ? LIMIT 10`,
-[`%${keyword}%`],
-(err,rows)=>{
+const res = await pool.query(
+`SELECT username,content
+FROM messages
+WHERE content ILIKE $1
+LIMIT 10`,
+[`%${keyword}%`]
+);
 
-if(!rows.length) return message.reply("No results.");
+if(!res.rows.length) return message.reply("No results.");
 
-message.reply(rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
-});
-}
+message.reply(res.rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
 
-/* GRANT */
-
-if(cmd==="grant" && message.author.id===OWNER){
-
-const user = message.mentions.users.first();
-if(!user) return message.reply("Mention user.");
-
-db.run(`INSERT INTO grants(user) VALUES(?)`,[user.id]);
-
-message.reply("Access granted.");
-}
-
-/* REVOKE */
-
-if(cmd==="revoke" && message.author.id===OWNER){
-
-const user = message.mentions.users.first();
-if(!user) return message.reply("Mention user.");
-
-db.run(`DELETE FROM grants WHERE user=?`,[user.id]);
-
-message.reply("Access revoked.");
-}
-
-/* GRANTED LIST */
-
-if(cmd==="granted" && message.author.id===OWNER){
-
-db.all(`SELECT user FROM grants`,[],(err,rows)=>{
-
-if(!rows.length) return message.reply("No granted users.");
-
-message.reply(rows.map(r=>`<@${r.user}>`).join("\n"));
-});
 }
 
 }catch(err){
+
 console.log(err);
 message.reply("Command error.");
+
 }
 
 });
