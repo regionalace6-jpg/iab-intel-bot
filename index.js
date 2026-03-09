@@ -1,11 +1,26 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js");
 const fetch = require("node-fetch");
+const sqlite3 = require("sqlite3").verbose();
 
 const PREFIX = "!";
 const OWNER = process.env.OWNER_ID;
 
+const db = new sqlite3.Database("./data.db");
+
+db.run(`CREATE TABLE IF NOT EXISTS grants (user TEXT)`);
+db.run(`CREATE TABLE IF NOT EXISTS notes (text TEXT)`);
+db.run(`CREATE TABLE IF NOT EXISTS tasks (text TEXT)`);
+db.run(`CREATE TABLE IF NOT EXISTS messages (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+user TEXT,
+username TEXT,
+content TEXT,
+channel TEXT,
+time INTEGER
+)`);
+
 const client = new Client({
-intents: [
+intents:[
 GatewayIntentBits.Guilds,
 GatewayIntentBits.GuildMessages,
 GatewayIntentBits.MessageContent,
@@ -13,144 +28,176 @@ GatewayIntentBits.DirectMessages
 ]
 });
 
-const notes = [];
-const tasks = [];
-
-client.once("ready", () => {
+client.once("ready", ()=>{
 console.log(`Online as ${client.user.tag}`);
-client.user.setActivity("Serving Lord Optic", { type: ActivityType.Playing });
+client.user.setActivity("Serving Lord Optic",{type:ActivityType.Playing});
 });
 
-client.on("messageCreate", async (message) => {
+function isAuthorized(id){
+return new Promise(resolve=>{
+if(id===OWNER) return resolve(true);
 
-if (message.author.bot) return;
-
-if (message.mentions.has(client.user)) {
-message.reply("Yes Lord Optic. Awaiting instructions.");
+db.get(`SELECT user FROM grants WHERE user=?`,[id],(err,row)=>{
+resolve(!!row);
+});
+});
 }
 
-if (!message.content.startsWith(PREFIX)) return;
+client.on("messageCreate",async message=>{
+
+if(message.author.bot) return;
+
+/* LOG MESSAGE */
+
+db.run(
+`INSERT INTO messages(user,username,content,channel,time) VALUES(?,?,?,?,?)`,
+[
+message.author.id,
+message.author.tag,
+message.content,
+message.channel.id,
+Date.now()
+]
+);
+
+/* LIMIT TO 1000 */
+
+db.run(`
+DELETE FROM messages
+WHERE id NOT IN (
+SELECT id FROM messages ORDER BY id DESC LIMIT 1000
+)
+`);
+
+if(message.mentions.has(client.user)){
+message.reply("Yes Lord Optic.");
+}
+
+if(!message.content.startsWith(PREFIX)) return;
 
 const args = message.content.slice(PREFIX.length).trim().split(/ +/);
 const cmd = args.shift().toLowerCase();
 
-try {
+try{
 
-if (cmd === "help") {
+/* HELP */
 
-const embed = new EmbedBuilder()
-.setTitle("INTELLIGENCE COMMAND CENTER")
-.setColor("Purple")
-.setDescription(`
-!help → command list
+if(cmd==="help"){
+message.reply(`
+INTELLIGENCE
+!dlookup
+!rlookup
+!osint
+!ip
 
-!dlookup <user/id> → discord lookup
-!rlookup <username> → roblox lookup
-!osint <username> → username search
-!ip <ip> → ip intelligence
+UTILITY
+!userinfo
+!serverinfo
+!ping
 
-!userinfo → user info
-!serverinfo → server info
-!botinfo → bot info
-!ping → latency
+HISTORY
+!history @user
+!channelhistory
+!search keyword
 
-!note add <text>
+ASSISTANT
+!note add
 !note list
-
-!task add <text>
+!task add
 !task list
 
-Owner:
-!say
-!status
+PERMISSIONS
+!grant
+!revoke
+!granted
 `);
-
-message.reply({ embeds:[embed] });
 }
 
-if (cmd === "ping") {
+/* PING */
+
+if(cmd==="ping"){
 message.reply(`Latency: ${client.ws.ping}ms`);
 }
 
-if (cmd === "botinfo") {
-message.reply("Personal intelligence assistant for **Lord Optic**.");
-}
+/* USER INFO */
 
-if (cmd === "userinfo") {
+if(cmd==="userinfo"){
 
 const user = message.mentions.users.first() || message.author;
 
 const embed = new EmbedBuilder()
-.setTitle("USER INTELLIGENCE")
+.setTitle("User Intelligence")
 .setThumbnail(user.displayAvatarURL())
 .addFields(
-{name:"Username", value:user.tag},
-{name:"ID", value:user.id},
-{name:"Bot", value:String(user.bot)},
-{name:"Created", value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
+{name:"Username",value:user.tag},
+{name:"ID",value:user.id},
+{name:"Bot",value:String(user.bot)},
+{name:"Created",value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
 );
 
-message.reply({ embeds:[embed] });
+message.reply({embeds:[embed]});
 }
 
-if (cmd === "serverinfo" && message.guild) {
+/* SERVER INFO */
+
+if(cmd==="serverinfo" && message.guild){
 
 const g = message.guild;
 
 const embed = new EmbedBuilder()
-.setTitle("SERVER INTELLIGENCE")
+.setTitle("Server Intelligence")
 .addFields(
-{name:"Server", value:g.name},
-{name:"Members", value:String(g.memberCount)},
-{name:"Created", value:`<t:${parseInt(g.createdTimestamp/1000)}:R>`}
+{name:"Server",value:g.name},
+{name:"Members",value:String(g.memberCount)},
+{name:"Created",value:`<t:${parseInt(g.createdTimestamp/1000)}:R>`}
 );
 
-message.reply({ embeds:[embed] });
+message.reply({embeds:[embed]});
 }
 
-if (cmd === "dlookup") {
+/* DISCORD LOOKUP */
+
+if(cmd==="dlookup"){
 
 let user;
 
-if (message.mentions.users.first()) {
+if(message.mentions.users.first()){
 user = message.mentions.users.first();
-} else {
+}else{
 user = await client.users.fetch(args[0]).catch(()=>null);
 }
 
-if (!user) return message.reply("User not found.");
+if(!user) return message.reply("User not found.");
 
 const embed = new EmbedBuilder()
-.setTitle("DISCORD LOOKUP")
+.setTitle("Discord Lookup")
 .setThumbnail(user.displayAvatarURL())
 .addFields(
-{name:"Username", value:user.tag},
-{name:"ID", value:user.id},
-{name:"Bot", value:String(user.bot)},
-{name:"Created", value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
-)
-.setURL(`https://discord.com/users/${user.id}`);
+{name:"Username",value:user.tag},
+{name:"ID",value:user.id},
+{name:"Bot",value:String(user.bot)},
+{name:"Created",value:`<t:${parseInt(user.createdTimestamp/1000)}:F>`}
+);
 
-message.reply({ embeds:[embed] });
+message.reply({embeds:[embed]});
 }
 
-if (cmd === "rlookup") {
+/* ROBLOX LOOKUP */
 
-const username = args[0];
-if (!username) return message.reply("Provide username.");
+if(cmd==="rlookup"){
 
-const res = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+const username=args[0];
+if(!username) return message.reply("Provide username.");
+
+const res = await fetch(`https://users.roblox.com/v1/usernames/users`,{
 method:"POST",
-headers:{ "Content-Type":"application/json" },
-body: JSON.stringify({
-usernames:[username],
-excludeBannedUsers:false
-})
+headers:{ "Content-Type":"application/json"},
+body:JSON.stringify({usernames:[username]})
 });
 
 const data = await res.json();
 
-if (!data.data.length) return message.reply("User not found.");
+if(!data.data.length) return message.reply("User not found.");
 
 const id = data.data[0].id;
 
@@ -158,26 +205,26 @@ const userRes = await fetch(`https://users.roblox.com/v1/users/${id}`);
 const user = await userRes.json();
 
 const embed = new EmbedBuilder()
-.setTitle("ROBLOX LOOKUP")
+.setTitle("Roblox Lookup")
 .addFields(
-{name:"Username", value:user.name},
-{name:"Display", value:user.displayName},
-{name:"ID", value:String(user.id)},
-{name:"Created", value:user.created}
+{name:"Username",value:user.name},
+{name:"Display",value:user.displayName},
+{name:"ID",value:String(user.id)},
+{name:"Created",value:user.created}
 )
 .setURL(`https://roblox.com/users/${user.id}/profile`);
 
-message.reply({ embeds:[embed] });
+message.reply({embeds:[embed]});
 }
 
-if (cmd === "osint") {
+/* OSINT */
+
+if(cmd==="osint"){
 
 const username = args[0];
-if (!username) return message.reply("Provide username.");
+if(!username) return message.reply("Provide username.");
 
-const embed = new EmbedBuilder()
-.setTitle("USERNAME OSINT")
-.setDescription(`
+message.reply(`
 GitHub → https://github.com/${username}
 Reddit → https://reddit.com/user/${username}
 Instagram → https://instagram.com/${username}
@@ -187,74 +234,151 @@ YouTube → https://youtube.com/@${username}
 Twitch → https://twitch.tv/${username}
 Steam → https://steamcommunity.com/id/${username}
 Roblox → https://roblox.com/users/profile?username=${username}
-NameMC → https://namemc.com/search?q=${username}
 `);
-
-message.reply({ embeds:[embed] });
 }
 
-if (cmd === "ip") {
+/* IP */
+
+if(cmd==="ip"){
 
 const ip = args[0];
-if (!ip) return message.reply("Provide IP.");
+if(!ip) return message.reply("Provide IP.");
 
 const res = await fetch(`http://ip-api.com/json/${ip}`);
 const data = await res.json();
 
-const embed = new EmbedBuilder()
-.setTitle("IP INTELLIGENCE")
-.addFields(
-{name:"Country", value:data.country || "Unknown"},
-{name:"Region", value:data.regionName || "Unknown"},
-{name:"City", value:data.city || "Unknown"},
-{name:"ISP", value:data.isp || "Unknown"}
-);
-
-message.reply({ embeds:[embed] });
+message.reply(`
+Country: ${data.country}
+Region: ${data.regionName}
+City: ${data.city}
+ISP: ${data.isp}
+`);
 }
 
-if (cmd === "note") {
+/* NOTES */
 
-if (args[0] === "add") {
-notes.push(args.slice(1).join(" "));
-return message.reply("Note saved.");
+if(cmd==="note"){
+
+if(args[0]==="add"){
+db.run(`INSERT INTO notes(text) VALUES(?)`,[args.slice(1).join(" ")]);
+message.reply("Note saved.");
 }
 
-if (args[0] === "list") {
-return message.reply(notes.join("\n") || "No notes.");
-}
-
-}
-
-if (cmd === "task") {
-
-if (args[0] === "add") {
-tasks.push(args.slice(1).join(" "));
-return message.reply("Task added.");
-}
-
-if (args[0] === "list") {
-return message.reply(tasks.join("\n") || "No tasks.");
-}
-
-}
-
-if (cmd === "say" && message.author.id === OWNER) {
-message.channel.send(args.join(" "));
-}
-
-if (cmd === "status" && message.author.id === OWNER) {
-
-client.user.setActivity(args.join(" "), {
-type: ActivityType.Playing
+if(args[0]==="list"){
+db.all(`SELECT text FROM notes`,[],(err,rows)=>{
+message.reply(rows.map(r=>r.text).join("\n") || "No notes.");
 });
-
-message.reply("Status updated.");
 }
 
-} catch (err) {
+}
 
-console.error(err);
+/* TASKS */
+
+if(cmd==="task"){
+
+if(args[0]==="add"){
+db.run(`INSERT INTO tasks(text) VALUES(?)`,[args.slice(1).join(" ")]);
+message.reply("Task added.");
+}
+
+if(args[0]==="list"){
+db.all(`SELECT text FROM tasks`,[],(err,rows)=>{
+message.reply(rows.map(r=>r.text).join("\n") || "No tasks.");
+});
+}
+
+}
+
+/* HISTORY */
+
+if(cmd==="history"){
+
+const user = message.mentions.users.first();
+if(!user) return message.reply("Mention user.");
+
+db.all(
+`SELECT content,time FROM messages WHERE user=? ORDER BY time DESC LIMIT 10`,
+[user.id],
+(err,rows)=>{
+
+if(!rows.length) return message.reply("No history.");
+
+const text = rows.map(r=>`<t:${Math.floor(r.time/1000)}:R> - ${r.content}`).join("\n");
+
+message.reply(text);
+});
+}
+
+/* CHANNEL HISTORY */
+
+if(cmd==="channelhistory"){
+
+db.all(
+`SELECT username,content FROM messages WHERE channel=? ORDER BY time DESC LIMIT 10`,
+[message.channel.id],
+(err,rows)=>{
+
+if(!rows.length) return message.reply("No history.");
+
+message.reply(rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
+});
+}
+
+/* SEARCH */
+
+if(cmd==="search"){
+
+const keyword = args.join(" ");
+
+db.all(
+`SELECT username,content FROM messages WHERE content LIKE ? LIMIT 10`,
+[`%${keyword}%`],
+(err,rows)=>{
+
+if(!rows.length) return message.reply("No results.");
+
+message.reply(rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
+});
+}
+
+/* GRANT */
+
+if(cmd==="grant" && message.author.id===OWNER){
+
+const user = message.mentions.users.first();
+if(!user) return message.reply("Mention user.");
+
+db.run(`INSERT INTO grants(user) VALUES(?)`,[user.id]);
+
+message.reply("Access granted.");
+}
+
+/* REVOKE */
+
+if(cmd==="revoke" && message.author.id===OWNER){
+
+const user = message.mentions.users.first();
+if(!user) return message.reply("Mention user.");
+
+db.run(`DELETE FROM grants WHERE user=?`,[user.id]);
+
+message.reply("Access revoked.");
+}
+
+/* GRANTED LIST */
+
+if(cmd==="granted" && message.author.id===OWNER){
+
+db.all(`SELECT user FROM grants`,[],(err,rows)=>{
+
+if(!rows.length) return message.reply("No granted users.");
+
+message.reply(rows.map(r=>`<@${r.user}>`).join("\n"));
+});
+}
+
+}catch(err){
+console.log(err);
 message.reply("Command error.");
 }
 
