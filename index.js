@@ -1,36 +1,46 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js");
-const fetch = require("node-fetch");
-const { Pool } = require("pg");
+const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require("discord.js")
+const fetch = require("node-fetch")
+const moment = require("moment")
+const { Pool } = require("pg")
 
-const PREFIX = "!";
-const OWNER = process.env.OWNER_ID;
+const PREFIX = "!"
+const OWNER = process.env.OWNER_ID
 
 const pool = new Pool({
 connectionString: process.env.DATABASE_URL,
-ssl: { rejectUnauthorized: false }
-});
+ssl:{rejectUnauthorized:false}
+})
+
+/* EMBED */
+
+function ui(title,desc){
+return new EmbedBuilder()
+.setColor("#6a00ff")
+.setTitle(title)
+.setDescription(desc||"")
+.setFooter({text:"Optic Intelligence System • Serving Lord Optic"})
+.setTimestamp()
+}
+
+/* CLIENT */
+
+const client = new Client({
+intents:[
+GatewayIntentBits.Guilds,
+GatewayIntentBits.GuildMessages,
+GatewayIntentBits.MessageContent,
+GatewayIntentBits.GuildMembers
+]
+})
+
+/* DATABASE */
 
 async function initDB(){
 
 await pool.query(`
 CREATE TABLE IF NOT EXISTS grants(
 user_id TEXT PRIMARY KEY
-)
-`);
-
-await pool.query(`
-CREATE TABLE IF NOT EXISTS notes(
-id SERIAL PRIMARY KEY,
-text TEXT
-)
-`);
-
-await pool.query(`
-CREATE TABLE IF NOT EXISTS tasks(
-id SERIAL PRIMARY KEY,
-text TEXT
-)
-`);
+)`)
 
 await pool.query(`
 CREATE TABLE IF NOT EXISTS messages(
@@ -40,42 +50,53 @@ username TEXT,
 content TEXT,
 channel_id TEXT,
 time BIGINT
-)
-`);
+)`)
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS notes(
+id SERIAL PRIMARY KEY,
+text TEXT
+)`)
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS tasks(
+id SERIAL PRIMARY KEY,
+text TEXT
+)`)
 
 }
 
-const client = new Client({
-intents:[
-GatewayIntentBits.Guilds,
-GatewayIntentBits.GuildMessages,
-GatewayIntentBits.MessageContent,
-GatewayIntentBits.DirectMessages
-]
-});
+/* READY */
 
-client.once("ready",async ()=>{
-console.log(`Online as ${client.user.tag}`);
-client.user.setActivity("Serving Lord Optic",{type:ActivityType.Playing});
-await initDB();
-});
+client.once("ready",async()=>{
 
-async function isAuthorized(id){
+console.log(`Online → ${client.user.tag}`)
 
-if(id === OWNER) return true;
+client.user.setActivity("Serving Lord Optic",{type:ActivityType.Playing})
+
+await initDB()
+
+})
+
+/* PERMISSION */
+
+async function hasAccess(id){
+
+if(id===OWNER) return true
 
 const res = await pool.query(
 `SELECT user_id FROM grants WHERE user_id=$1`,
 [id]
-);
+)
 
-return res.rows.length > 0;
-
+return res.rows.length>0
 }
+
+/* MESSAGE EVENT */
 
 client.on("messageCreate",async message=>{
 
-if(message.author.bot) return;
+if(message.author.bot) return
 
 /* LOG MESSAGE */
 
@@ -89,129 +110,181 @@ message.content,
 message.channel.id,
 Date.now()
 ]
-);
+)
 
-/* LIMIT 1000 MESSAGES */
+/* LIMIT */
 
 await pool.query(`
 DELETE FROM messages
-WHERE id NOT IN (
+WHERE id NOT IN(
 SELECT id FROM messages ORDER BY id DESC LIMIT 1000
 )
-`);
+`)
+
+/* MENTION */
 
 if(message.mentions.has(client.user)){
-message.reply("Yes Lord Optic.");
+return message.reply("Yes Lord Optic, I am ready.")
 }
 
-if(!message.content.startsWith(PREFIX)) return;
+/* COMMANDS */
 
-const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-const cmd = args.shift().toLowerCase();
+if(!message.content.startsWith(PREFIX)) return
 
-try{
+const args = message.content.slice(PREFIX.length).split(/ +/)
+const cmd = args.shift().toLowerCase()
 
 /* HELP */
 
 if(cmd==="help"){
 
-message.reply(`
-INTELLIGENCE
-!dlookup
-!rlookup
-!osint
-!ip
+const e = ui("🧠 OPTIC INTELLIGENCE SYSTEM")
 
-UTILITY
-!userinfo
-!serverinfo
-!ping
+.addFields(
 
-HISTORY
-!history @user
-!channelhistory
-!search keyword
+{name:"📊 Analytics",
+value:"`!serverstats`\n`!topusers`\n`!channelstats`"},
 
-ASSISTANT
-!note add
-!note list
-!task add
-!task list
+{name:"👤 Utilities",
+value:"`!avatar`\n`!userinfo`\n`!serverinfo`\n`!ping`"},
 
-PERMISSIONS
-!grant
-!revoke
-!granted
-`);
+{name:"🧠 Assistant",
+value:"`!note add`\n`!note list`\n`!task add`\n`!task list`"},
+
+{name:"🎮 Roblox",
+value:"`!rlookup username`"},
+
+{name:"⚙ Permissions",
+value:"`!grant`\n`!revoke`\n`!granted`"}
+
+)
+
+message.reply({embeds:[e]})
 
 }
 
-/* GRANT */
+/* PING */
 
-if(cmd==="grant" && message.author.id===OWNER){
+if(cmd==="ping"){
+return message.reply(`🏓 ${client.ws.ping}ms`)
+}
 
-const user = message.mentions.users.first();
-if(!user) return message.reply("Mention user.");
+/* AVATAR */
 
-await pool.query(
-`INSERT INTO grants(user_id) VALUES($1) ON CONFLICT DO NOTHING`,
-[user.id]
-);
+if(cmd==="avatar"){
 
-message.reply("Access granted.");
+const user = message.mentions.users.first()||message.author
+
+const e = ui("Avatar").setImage(
+user.displayAvatarURL({size:1024,dynamic:true})
+)
+
+message.reply({embeds:[e]})
 
 }
 
-/* REVOKE */
+/* USERINFO */
 
-if(cmd==="revoke" && message.author.id===OWNER){
+if(cmd==="userinfo"){
 
-const user = message.mentions.users.first();
-if(!user) return message.reply("Mention user.");
+const user = message.mentions.users.first()||message.author
 
-await pool.query(
-`DELETE FROM grants WHERE user_id=$1`,
-[user.id]
-);
+const e = ui("User Info")
 
-message.reply("Access revoked.");
+.addFields(
 
-}
+{name:"Username",value:user.tag,inline:true},
+{name:"User ID",value:user.id,inline:true},
 
-/* GRANTED LIST */
+{name:"Created",
+value:moment(user.createdAt).format("LLLL")}
 
-if(cmd==="granted" && message.author.id===OWNER){
+)
 
-const res = await pool.query(`SELECT user_id FROM grants`);
-
-if(!res.rows.length) return message.reply("No users granted.");
-
-message.reply(res.rows.map(r=>`<@${r.user_id}>`).join("\n"));
+message.reply({embeds:[e]})
 
 }
 
-/* NOTE */
+/* SERVERINFO */
+
+if(cmd==="serverinfo"){
+
+const g = message.guild
+
+const e = ui("Server Info")
+
+.addFields(
+
+{name:"Server",value:g.name},
+{name:"Members",value:g.memberCount.toString()},
+{name:"Created",value:moment(g.createdAt).format("LLLL")}
+
+)
+
+message.reply({embeds:[e]})
+
+}
+
+/* SERVER STATS */
+
+if(cmd==="serverstats"){
+
+const res = await pool.query(`SELECT COUNT(*) FROM messages`)
+
+const e = ui("Server Analytics")
+
+.addFields(
+{name:"Messages Logged",value:res.rows[0].count}
+)
+
+message.reply({embeds:[e]})
+
+}
+
+/* TOP USERS */
+
+if(cmd==="topusers"){
+
+const res = await pool.query(`
+SELECT username,COUNT(*) as count
+FROM messages
+GROUP BY username
+ORDER BY count DESC
+LIMIT 5
+`)
+
+const e = ui("Top Active Users")
+
+.setDescription(
+res.rows.map(r=>`${r.username} — ${r.count}`).join("\n")
+)
+
+message.reply({embeds:[e]})
+
+}
+
+/* NOTES */
 
 if(cmd==="note"){
 
 if(args[0]==="add"){
 
-const text = args.slice(1).join(" ");
+const text = args.slice(1).join(" ")
 
 await pool.query(
 `INSERT INTO notes(text) VALUES($1)`,
 [text]
-);
+)
 
-message.reply("Note saved.");
+message.reply("Note saved.")
 
 }
 
 if(args[0]==="list"){
 
-const res = await pool.query(`SELECT text FROM notes`);
+const res = await pool.query(`SELECT text FROM notes`)
 
-message.reply(res.rows.map(r=>r.text).join("\n") || "No notes.");
+message.reply(res.rows.map(r=>r.text).join("\n")||"No notes")
 
 }
 
@@ -223,98 +296,107 @@ if(cmd==="task"){
 
 if(args[0]==="add"){
 
-const text = args.slice(1).join(" ");
+const text = args.slice(1).join(" ")
 
 await pool.query(
 `INSERT INTO tasks(text) VALUES($1)`,
 [text]
-);
+)
 
-message.reply("Task added.");
+message.reply("Task added.")
 
 }
 
 if(args[0]==="list"){
 
-const res = await pool.query(`SELECT text FROM tasks`);
+const res = await pool.query(`SELECT text FROM tasks`)
 
-message.reply(res.rows.map(r=>r.text).join("\n") || "No tasks.");
+message.reply(res.rows.map(r=>r.text).join("\n")||"No tasks")
 
+}
+
+}
+
+/* ROBLOX LOOKUP */
+
+if(cmd==="rlookup"){
+
+if(!args[0]) return message.reply("Provide username")
+
+try{
+
+const r = await fetch(
+"https://users.roblox.com/v1/usernames/users",
+{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({usernames:[args[0]]})
+})
+
+const data = await r.json()
+
+if(!data.data[0]) return message.reply("User not found")
+
+const id = data.data[0].id
+
+const info = await fetch(
+`https://users.roblox.com/v1/users/${id}`
+).then(r=>r.json())
+
+const avatar = await fetch(
+`https://thumbnails.roblox.com/v1/users/avatar?userIds=${id}&size=420x420&format=Png`
+).then(r=>r.json())
+
+const e = ui("Roblox Profile")
+
+.setThumbnail(avatar.data[0].imageUrl)
+
+.addFields(
+
+{name:"Username",value:info.name},
+{name:"Display",value:info.displayName},
+{name:"Created",value:moment(info.created).format("LLLL")}
+
+)
+
+message.reply({embeds:[e]})
+
+}catch{
+message.reply("Roblox lookup failed.")
 }
 
 }
 
-/* HISTORY */
+/* GRANT */
 
-if(cmd==="history"){
+if(cmd==="grant" && message.author.id===OWNER){
 
-const user = message.mentions.users.first();
-if(!user) return message.reply("Mention user.");
+const user = message.mentions.users.first()
 
-const res = await pool.query(
-`SELECT content,time FROM messages
-WHERE user_id=$1
-ORDER BY time DESC
-LIMIT 10`,
+await pool.query(
+`INSERT INTO grants(user_id) VALUES($1) ON CONFLICT DO NOTHING`,
 [user.id]
-);
+)
 
-if(!res.rows.length) return message.reply("No history.");
-
-const text = res.rows.map(r=>
-`<t:${Math.floor(r.time/1000)}:R> - ${r.content}`
-).join("\n");
-
-message.reply(text);
+message.reply("Access granted.")
 
 }
 
-/* CHANNEL HISTORY */
+/* REVOKE */
 
-if(cmd==="channelhistory"){
+if(cmd==="revoke" && message.author.id===OWNER){
 
-const res = await pool.query(
-`SELECT username,content
-FROM messages
-WHERE channel_id=$1
-ORDER BY time DESC
-LIMIT 10`,
-[message.channel.id]
-);
+const user = message.mentions.users.first()
 
-if(!res.rows.length) return message.reply("No history.");
+await pool.query(
+`DELETE FROM grants WHERE user_id=$1`,
+[user.id]
+)
 
-message.reply(res.rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
+message.reply("Access revoked.")
 
 }
 
-/* SEARCH */
+})
 
-if(cmd==="search"){
-
-const keyword = args.join(" ");
-
-const res = await pool.query(
-`SELECT username,content
-FROM messages
-WHERE content ILIKE $1
-LIMIT 10`,
-[`%${keyword}%`]
-);
-
-if(!res.rows.length) return message.reply("No results.");
-
-message.reply(res.rows.map(r=>`${r.username}: ${r.content}`).join("\n"));
-
-}
-
-}catch(err){
-
-console.log(err);
-message.reply("Command error.");
-
-}
-
-});
-
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN)
